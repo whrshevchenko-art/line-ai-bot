@@ -1,3 +1,9 @@
-export default function Home() {
-  return <h1>LINE AI Bot is running</h1>;
+{
+  "name": "line-ai-bot",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "next": "latest"
+  }
 }
