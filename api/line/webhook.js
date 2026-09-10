@@ -1,4 +1,4 @@
-export default async function handler(req, res) {
+module.exports = async function handler(req, res) {
   if (req.method !== "POST") {
     return res.status(200).send("LINE AI Bot is running");
   }
@@ -7,7 +7,10 @@ export default async function handler(req, res) {
     const events = req.body.events || [];
 
     for (const event of events) {
-      if (event.type === "message" && event.message.type === "text") {
+      if (
+        event.type === "message" &&
+        event.message.type === "text"
+      ) {
         const userMessage = event.message.text;
 
         await fetch("https://api.line.me/v2/bot/message/reply", {
@@ -35,4 +38,4 @@ export default async function handler(req, res) {
     console.error(error);
     return res.status(200).json({ status: "error" });
   }
-}
+};
