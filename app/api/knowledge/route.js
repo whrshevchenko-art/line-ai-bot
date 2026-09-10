@@ -2,7 +2,7 @@ import { createClient } from "@supabase/supabase-js";
 
 const supabase = createClient(
   process.env.SUPABASE_URL,
-  process.env.SUPABASE_KEY
+  process.env.SUPABASE_SERVICE_ROLE_KEY
 );
 
 // ナレッジ一覧取得
@@ -61,20 +61,27 @@ export async function POST(request) {
       const arrayBuffer = await file.arrayBuffer();
       const buffer = Buffer.from(arrayBuffer);
 
-      // =========================
-      // Supabase Storageへ保存
-      // =========================
-      const fileName =
-        `${Date.now()}-${file.name.replace(/[^a-zA-Z0-9._-]/g, "_")}`;
+      const safeName = file.name
+        .replace(/\.pdf$/i, "")
+        .replace(/[^a-zA-Z0-9_-]/g, "_");
 
-      const { error: uploadError } = await supabase.storage
-        .from("knowledge-files")
-        .upload(fileName, buffer, {
-          contentType: "application/pdf",
-          upsert: false,
-        });
+      const fileName = `${Date.now()}_${safeName}.pdf`;
+
+      console.log("PDF upload start");
+      console.log("bucket:", "knowledge-files");
+      console.log("path:", fileName);
+
+      const { data: uploadData, error: uploadError } =
+        await supabase.storage
+          .from("knowledge-files")
+          .upload(fileName, buffer, {
+            contentType: "application/pdf",
+            upsert: false,
+          });
 
       if (uploadError) {
+        console.error("Supabase Storage upload error:", uploadError);
+
         return Response.json(
           {
             error: `PDF保存に失敗しました: ${uploadError.message}`,
@@ -83,9 +90,8 @@ export async function POST(request) {
         );
       }
 
-      // =========================
-      // まずはStorage登録成功だけ確認
-      // =========================
+      console.log("PDF upload success:", uploadData);
+
       return Response.json({
         success: true,
         message: "PDFをStorageに保存しました。",
