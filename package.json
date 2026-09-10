@@ -5,9 +5,10 @@
   "scripts": {
     "build": "next build"
   },
-"dependencies": {
-  "next": "latest",
-  "openai": "latest",
-  "@supabase/supabase-js": "latest",
-  "pdf-parse": "latest"
+  "dependencies": {
+    "next": "latest",
+    "openai": "latest",
+    "@supabase/supabase-js": "latest",
+    "pdf-parse": "latest"
+  }
 }
