@@ -19,7 +19,14 @@ export default function Home() {
   const loadKnowledge = async () => {
     try {
       const res = await fetch("/api/knowledge");
-      const data = await res.json();
+      const text = await res.text();
+
+      if (!text) {
+        console.error("ナレッジAPIが空のレスポンスを返しました");
+        return;
+      }
+
+      const data = JSON.parse(text);
 
       if (Array.isArray(data)) {
         setKnowledge(data);
@@ -57,10 +64,25 @@ export default function Home() {
         }),
       });
 
-      const data = await res.json();
+      const text = await res.text();
+
+      console.log("通常ナレッジAPI:", res.status, text);
+
+      let data;
+
+      try {
+        data = JSON.parse(text);
+      } catch {
+        alert(
+          `保存に失敗しました\n\nHTTPステータス: ${res.status}\n\nサーバーの返答:\n${text || "(空)"}` 
+        );
+        return;
+      }
 
       if (!res.ok) {
-        alert(`保存に失敗しました: ${data.error || "不明なエラー"}`);
+        alert(
+          `保存に失敗しました\n\n${data.error || "不明なエラー"}`
+        );
         return;
       }
 
@@ -73,7 +95,10 @@ export default function Home() {
       alert("ナレッジを保存したで！");
     } catch (error) {
       console.error("ナレッジ保存エラー:", error);
-      alert(`保存に失敗しました: ${error.message}`);
+
+      alert(
+        `保存に失敗しました\n\n${error.message}`
+      );
     } finally {
       setLoading(false);
     }
@@ -104,15 +129,24 @@ export default function Home() {
         body: formData,
       });
 
-      console.log("APIレスポンス:", res.status);
+      const text = await res.text();
 
-      const data = await res.json();
+      console.log("PDF APIレスポンス:", res.status, text);
 
-      console.log("APIデータ:", data);
+      let data;
+
+      try {
+        data = JSON.parse(text);
+      } catch {
+        alert(
+          `PDF登録に失敗しました\n\nHTTPステータス: ${res.status}\n\nサーバーの返答:\n${text || "(空)"}` 
+        );
+        return;
+      }
 
       if (!res.ok) {
         alert(
-          `PDF登録に失敗しました\n\nステータス: ${res.status}\n\n${data.error || "不明なエラー"}`
+          `PDF登録に失敗しました\n\nHTTPステータス: ${res.status}\n\n${data.error || "不明なエラー"}`
         );
         return;
       }
@@ -134,7 +168,7 @@ export default function Home() {
       console.error("PDFアップロードエラー:", error);
 
       alert(
-        `PDF登録に失敗しました\n\nエラー内容:\n${error.message}`
+        `PDF登録に失敗しました\n\n${error.message}`
       );
     } finally {
       setPdfLoading(false);
@@ -156,9 +190,6 @@ export default function Home() {
 
       <hr />
 
-      {/* =========================
-          PDFアップロード
-      ========================= */}
       <h2>📄 PDFからナレッジ追加</h2>
 
       <input
@@ -218,9 +249,6 @@ export default function Home() {
 
       <hr />
 
-      {/* =========================
-          通常のナレッジ追加
-      ========================= */}
       <h2>📝 ナレッジ追加</h2>
 
       <input
@@ -275,9 +303,6 @@ export default function Home() {
 
       <hr />
 
-      {/* =========================
-          登録済みナレッジ
-      ========================= */}
       <h2>📚 登録済みナレッジ</h2>
 
       {knowledge.length === 0 && (
