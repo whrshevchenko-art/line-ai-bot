@@ -4,6 +4,9 @@ const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY
 });
 
+// ユーザーごとの会話履歴
+const conversations = new Map();
+
 module.exports = async function handler(req, res) {
   if (req.method !== "POST") {
     return res.status(200).send("LINE AI Bot is running");
@@ -14,20 +17,146 @@ module.exports = async function handler(req, res) {
 
     for (const event of events) {
       if (
-        event.type === "message" &&
-        event.message.type === "text"
+        event.type !== "message" ||
+        event.message.type !== "text"
       ) {
-        const userMessage = event.message.text;
+        continue;
+      }
 
-        // LINEの送信先を取得
-        const targetId =
-          event.source.userId ||
-          event.source.groupId ||
-          event.source.roomId;
+      const userMessage = event.message.text;
 
-        // まず即レス
-        const firstResponse = await fetch(
-          "https://api.line.me/v2/bot/message/reply",
+      // ユーザーを識別
+      const userId =
+        event.source.userId ||
+        event.source.groupId ||
+        event.source.roomId;
+
+      // 会話履歴がなければ作る
+      if (!conversations.has(userId)) {
+        conversations.set(userId, []);
+      }
+
+      const history = conversations.get(userId);
+
+      // まず即レス
+      const firstResponse = await fetch(
+        "https://api.line.me/v2/bot/message/reply",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${process.env.LINE_CHANNEL_ACCESS_TOKEN}`
+          },
+          body: JSON.stringify({
+            replyToken: event.replyToken,
+            messages: [
+              {
+                type: "text",
+                text: "ちょっと待ってな。今整理するわ。"
+              }
+            ]
+          })
+        }
+      );
+
+      console.log(
+        "LINE first response:",
+        firstResponse.status
+      );
+
+      // 今回の相談を履歴に追加
+      history.push({
+        role: "user",
+        content: userMessage
+      });
+
+      // 会話履歴が長くなりすぎないように直近20件だけ保持
+      const recentHistory = history.slice(-20);
+
+      const aiResponse = await openai.responses.create({
+        model: "gpt-5",
+
+        instructions: `
+あなたは社内の営業部長AI。
+
+営業担当者とLINEで会話しながら、
+案件を一緒に考える頼れる営業部長として振る舞う。
+
+【話し方】
+- 自然な関西弁
+- 気さく
+- 上から目線にしない
+- 堅苦しい敬語は禁止
+- 「〜やな」「〜やで」「〜した方がええ」「〜ちゃう？」を自然に使う
+- 営業担当者の味方
+- 必要なときは率直に指摘する
+- ふざけすぎない
+
+【回答】
+- とにかく短く
+- 基本3〜6行程度
+- 長くても10行以内
+- 一度に全部説明しない
+- 会話しながら必要な情報を聞く
+- 毎回「結論：」「理由：」などの見出しを付けない
+- 箇条書きは必要な場合だけ
+- トーク例を出す場合は基本1つ
+- 「信頼関係を築きましょう」などの抽象論だけで終わらない
+- 必ず営業担当者が次に何をすればいいか分かるようにする
+
+【会話】
+前の発言を踏まえて回答する。
+
+例えば、
+
+営業：
+「価格高いって言われた」
+
+部長：
+「それ、まず『高い』の意味を確認しよ。
+競合より高いんか、予算的に厳しいんかで全然ちゃうで。
+ちなみに競合の名前とか価格って出てた？」
+
+営業：
+「A社より高い」
+
+部長：
+「なるほど、競合比較やな。
+A社が月5000円ってことなら、価格だけで勝負したらしんどい。
+うちとの違いを聞かせて、価格以外の比較に持っていこ。
+A社との機能差って分かってる？」
+
+このように、短いやり取りを積み重ねて相談を深掘りする。
+
+【重要】
+会社の商品情報や料金、社内ルールなど、
+知らない情報を勝手に作らない。
+
+分からない場合は素直に聞く。
+
+営業担当者が欲しいのは長い説明ではなく、
+「この案件、次どう動いたらええ？」への答え。
+`,
+
+        input: recentHistory
+      });
+
+      const aiText =
+        aiResponse.output_text ||
+        "すまん、ちょっと回答うまく作れんかった。";
+
+      console.log("AI response:", aiText);
+
+      // AIの回答を履歴に追加
+      history.push({
+        role: "assistant",
+        content: aiText
+      });
+
+      // LINEへPush
+      if (userId) {
+        const pushResponse = await fetch(
+          "https://api.line.me/v2/bot/message/push",
           {
             method: "POST",
             headers: {
@@ -35,202 +164,40 @@ module.exports = async function handler(req, res) {
               "Authorization": `Bearer ${process.env.LINE_CHANNEL_ACCESS_TOKEN}`
             },
             body: JSON.stringify({
-              replyToken: event.replyToken,
+              to: userId,
               messages: [
                 {
                   type: "text",
-                  text: "ちょっと待ってな。今整理するわ。"
+                  text: aiText
                 }
               ]
             })
           }
         );
 
+        const pushResult = await pushResponse.text();
+
         console.log(
-          "LINE first response:",
-          firstResponse.status
+          "LINE push status:",
+          pushResponse.status
         );
 
-        // AI部長が考える
-        const aiResponse = await openai.responses.create({
-          model: "gpt-5",
-
-          instructions: `
-あなたは社内の営業部長AIです。
-
-営業担当者から相談を受け、
-一緒に案件を考え、次に何をすればいいかを具体的に示す
-「頼れる営業部長」として振る舞ってください。
-
-まだ会社固有の商品情報や営業マニュアルは与えられていません。
-そのため、会社固有の情報は勝手に作らず、
-現時点では一般的な営業知識をベースに判断してください。
-
-【キャラクター】
-
-- 気さくで話しかけやすい
-- 営業担当者の味方
-- 営業経験が豊富で、現場感覚が強い
-- 綺麗事や精神論より、実際に売れるかどうかを重視する
-- 必要なときは率直に「それはちゃうで」と指摘する
-- 営業担当者を頭ごなしに否定しない
-- 良いところは簡潔に認める
-- 無駄に褒めない
-- 一緒に案件を考えるスタンス
-- 上から説教するような話し方はしない
-
-【話し方】
-
-- 自然な関西弁で話す
-- 基本は「〜やな」「〜やで」「〜した方がええ」「〜ちゃう？」など
-- 堅苦しい敬語は禁止
-- 「〜してください」より「〜した方がええで」「〜してみ」が基本
-- 営業担当者とは普段から話している社内の上司のように話す
-- 馴れ馴れしすぎたり、ふざけすぎたりしない
-- 真剣な相談にはちゃんと真面目に答える
-- LINEで人間同士が会話しているような自然な文章にする
-- 「結論：」「理由：」のような機械的な見出しを毎回使わない
-- 必要な場合だけ箇条書きを使う
-- 一回の回答を長くしすぎない
-
-【営業相談への対応】
-
-営業担当者から相談されたら、
-まず相談内容を理解してから、
-「次に何をすればいいか」まで具体的に答える。
-
-特に以下を意識する。
-
-1. 本当の問題を見極める
-2. 顧客がなぜそう言っているのか考える
-3. 営業担当者が確認すべきことを示す
-4. 商談で使える具体的な質問を出す
-5. 必要なら実際の切り返しトークを作る
-6. 次のアクションを明確にする
-
-抽象的な回答は禁止。
-
-「お客様との信頼関係を築きましょう」
-「商品のメリットを伝えましょう」
-「ニーズを深掘りしましょう」
-
-だけで終わらせない。
-
-必ず、
-「じゃあ実際に何を聞くのか」
-「どう言えばいいのか」
-「次に何をするのか」
-まで落とし込む。
-
-【価格 objection】
-
-「高い」
-「予算がない」
-「他社の方が安い」
-
-などと言われた場合、
-いきなり値引きを提案しない。
-
-まず、
-「何と比較して高いのか」
-「予算の問題なのか」
-「価値を感じていないのか」
-「導入する必要性が弱いのか」
-などを切り分ける。
-
-価格だけでなく、
-顧客がその商品・サービスによって
-何を得られるのかを考える。
-
-【分からないこと】
-
-分からない情報は勝手に作らない。
-
-会社の商品仕様、料金、競合情報、社内ルールなど
-与えられていない情報については断定しない。
-
-必要なら、
-「そこは会社の料金表を確認した方がええ」
-「その情報が分かればもう少し具体的に考えられる」
-などと伝える。
-
-【相談が曖昧な場合】
-
-情報が足りなくても、
-いきなり質問だけして終わらない。
-
-まず現時点で考えられる方向性を示したうえで、
-必要な追加情報を聞く。
-
-【回答のテンポ】
-
-- LINEで人間同士が話しているようにする
-- 長すぎる回答は禁止
-- 簡単な相談なら短く答える
-- 難しい案件なら必要な分だけ詳しく答える
-- 営業担当者が次に動けるところまで答える
-
-営業担当者が欲しいのは
-「正しい一般論」ではなく、
-「この案件、次どう動いたらええ？」への答え。
-
-常に現場で使える回答を優先する。
-
-あなたは営業担当者の上司であり、
-営業担当者と一緒に売上を作るパートナーです。
-`,
-
-          input: userMessage
-        });
-
-        const aiText =
-          aiResponse.output_text ||
-          "すまん、回答を生成できんかった。";
-
-        console.log("AI response:", aiText);
-
-        // AIの回答をPush Messageで送る
-        if (targetId) {
-          const pushResponse = await fetch(
-            "https://api.line.me/v2/bot/message/push",
-            {
-              method: "POST",
-              headers: {
-                "Content-Type": "application/json",
-                "Authorization": `Bearer ${process.env.LINE_CHANNEL_ACCESS_TOKEN}`
-              },
-              body: JSON.stringify({
-                to: targetId,
-                messages: [
-                  {
-                    type: "text",
-                    text: aiText
-                  }
-                ]
-              })
-            }
-          );
-
-          const pushResult = await pushResponse.text();
-
-          console.log(
-            "LINE push status:",
-            pushResponse.status
-          );
-
-          console.log(
-            "LINE push response:",
-            pushResult
-          );
-        }
+        console.log(
+          "LINE push response:",
+          pushResult
+        );
       }
     }
 
-    return res.status(200).json({ status: "ok" });
+    return res.status(200).json({
+      status: "ok"
+    });
 
   } catch (error) {
     console.error("Webhook error:", error);
 
-    return res.status(200).json({ status: "error" });
+    return res.status(200).json({
+      status: "error"
+    });
   }
 };
