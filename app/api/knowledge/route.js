@@ -1,5 +1,5 @@
 import { createClient } from "@supabase/supabase-js";
-import pdf from "pdf-parse";
+import { PDFParse } from "pdf-parse";
 
 const supabase = createClient(
   process.env.SUPABASE_URL,
@@ -55,18 +55,28 @@ export async function POST(request) {
       const arrayBuffer = await file.arrayBuffer();
       const buffer = Buffer.from(arrayBuffer);
 
+      // =========================
       // PDF本文を抽出
-      const parsed = await pdf(buffer);
+      // =========================
+      const parser = new PDFParse({
+        data: buffer,
+      });
+
+      const parsed = await parser.getText();
+      await parser.destroy();
+
       const extractedText = parsed.text;
 
-      if (!extractedText.trim()) {
+      if (!extractedText || !extractedText.trim()) {
         return Response.json(
           { error: "PDFから本文を読み取れませんでした。" },
           { status: 400 }
         );
       }
 
+      // =========================
       // Supabase Storageへ保存
+      // =========================
       const fileName =
         `${Date.now()}-${file.name.replace(/[^a-zA-Z0-9._-]/g, "_")}`;
 
@@ -79,12 +89,16 @@ export async function POST(request) {
 
       if (uploadError) {
         return Response.json(
-          { error: `PDF保存に失敗しました: ${uploadError.message}` },
+          {
+            error: `PDF保存に失敗しました: ${uploadError.message}`,
+          },
           { status: 500 }
         );
       }
 
+      // =========================
       // 抽出した本文をknowledgeへ保存
+      // =========================
       const { data, error: insertError } = await supabase
         .from("knowledge")
         .insert([
@@ -99,7 +113,9 @@ export async function POST(request) {
 
       if (insertError) {
         return Response.json(
-          { error: `ナレッジ保存に失敗しました: ${insertError.message}` },
+          {
+            error: `ナレッジ保存に失敗しました: ${insertError.message}`,
+          },
           { status: 500 }
         );
       }
@@ -148,10 +164,12 @@ export async function POST(request) {
     return Response.json(data);
 
   } catch (error) {
-    console.error(error);
+    console.error("knowledge API error:", error);
 
     return Response.json(
-      { error: `処理に失敗しました: ${error.message}` },
+      {
+        error: `処理に失敗しました: ${error.message}`,
+      },
       { status: 500 }
     );
   }
