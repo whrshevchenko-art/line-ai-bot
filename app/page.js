@@ -25,7 +25,7 @@ export default function Home() {
         setKnowledge(data);
       }
     } catch (error) {
-      console.error(error);
+      console.error("ナレッジ取得エラー:", error);
     }
   };
 
@@ -60,7 +60,7 @@ export default function Home() {
       const data = await res.json();
 
       if (!res.ok) {
-        alert(data.error || "保存に失敗しました");
+        alert(`保存に失敗しました: ${data.error || "不明なエラー"}`);
         return;
       }
 
@@ -72,8 +72,8 @@ export default function Home() {
 
       alert("ナレッジを保存したで！");
     } catch (error) {
-      console.error(error);
-      alert("保存に失敗しました");
+      console.error("ナレッジ保存エラー:", error);
+      alert(`保存に失敗しました: ${error.message}`);
     } finally {
       setLoading(false);
     }
@@ -97,15 +97,23 @@ export default function Home() {
       formData.append("title", pdfTitle || pdfFile.name);
       formData.append("category", pdfCategory || "PDF");
 
+      console.log("PDFアップロード開始:", pdfFile.name);
+
       const res = await fetch("/api/knowledge", {
         method: "POST",
         body: formData,
       });
 
+      console.log("APIレスポンス:", res.status);
+
       const data = await res.json();
 
+      console.log("APIデータ:", data);
+
       if (!res.ok) {
-        alert(data.error || "PDF登録に失敗しました");
+        alert(
+          `PDF登録に失敗しました\n\nステータス: ${res.status}\n\n${data.error || "不明なエラー"}`
+        );
         return;
       }
 
@@ -114,6 +122,7 @@ export default function Home() {
       setPdfCategory("PDF");
 
       const fileInput = document.getElementById("pdf-upload");
+
       if (fileInput) {
         fileInput.value = "";
       }
@@ -122,8 +131,11 @@ export default function Home() {
 
       alert("PDFをナレッジに登録したで！");
     } catch (error) {
-      console.error(error);
-      alert("PDF登録に失敗しました");
+      console.error("PDFアップロードエラー:", error);
+
+      alert(
+        `PDF登録に失敗しました\n\nエラー内容:\n${error.message}`
+      );
     } finally {
       setPdfLoading(false);
     }
@@ -179,7 +191,9 @@ export default function Home() {
         id="pdf-upload"
         type="file"
         accept=".pdf,application/pdf"
-        onChange={(e) => setPdfFile(e.target.files?.[0] || null)}
+        onChange={(e) => {
+          setPdfFile(e.target.files?.[0] || null);
+        }}
         style={{
           marginBottom: "10px",
         }}
