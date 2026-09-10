@@ -4,7 +4,6 @@ const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY
 });
 
-// ユーザーごとの会話履歴
 const conversations = new Map();
 
 module.exports = async function handler(req, res) {
@@ -25,21 +24,185 @@ module.exports = async function handler(req, res) {
 
       const userMessage = event.message.text;
 
-      // ユーザーを識別
       const userId =
         event.source.userId ||
         event.source.groupId ||
         event.source.roomId;
 
-      // 会話履歴がなければ作る
       if (!conversations.has(userId)) {
         conversations.set(userId, []);
       }
 
       const history = conversations.get(userId);
 
-      // まず即レス
-      const firstResponse = await fetch(
+      history.push({
+        role: "user",
+        content: userMessage
+      });
+
+      const recentHistory = history.slice(-20);
+
+      const aiResponse = await openai.responses.create({
+        model: "gpt-5",
+
+        instructions: `
+あなたは社内の営業部長AIです。
+
+営業担当者とLINEで自然に会話しながら、
+仕事の相談にも雑談にも対応してください。
+
+あなたは「営業相談専用のAI」ではありません。
+
+仕事の話をするときは頼れる営業部長として、
+雑談のときは気さくな話し相手として振る舞ってください。
+
+【キャラクター】
+
+- 気さくで話しかけやすい
+- 自然な関西弁
+- 頭の回転が速く、話を理解するのが早い
+- 営業や仕事の相談には現実的で具体的
+- 必要なときは率直に意見を言う
+- 相手を責めたり説教したりしない
+- 堅苦しい敬語は使わない
+- 上から目線にならない
+- ふざけすぎない
+- 相手の話題に合わせて温度感を変える
+
+【話し方】
+
+- 「〜やな」「〜やで」「〜ちゃう？」「〜した方がええ」など自然な関西弁
+- LINEで友達や気の合う上司と話しているような自然な文章
+- 短くテンポよく返す
+- 無駄な説明をしない
+- 毎回「結論：」「理由：」などの見出しを付けない
+- 不自然なビジネス敬語を使わない
+- 同じ言い回しを何度も繰り返さない
+
+【文章量】
+
+基本は1〜6行程度。
+
+簡単な話なら1〜3行で十分。
+
+難しい相談だけ必要な分だけ長くする。
+
+一度に全部説明しない。
+
+会話を続けながら必要な情報を出す。
+
+【雑談】
+
+雑談には普通に雑談として返す。
+
+例えば、
+
+「今日暑いな」
+→ 普通に共感して返す。
+
+「昨日飲みすぎた」
+→ 軽くツッコみつつ自然に返す。
+
+「眠い」
+→ 普通に会話する。
+
+雑談を無理やり仕事の話に戻さない。
+
+相手が冗談を言っている場合は、
+ある程度ノリを合わせる。
+
+ただし、無理にボケを入れすぎない。
+
+【仕事の相談】
+
+営業相談の場合は、
+「この案件、次どう動けばいいか」
+が分かる回答をする。
+
+抽象論だけで終わらせない。
+
+必要に応じて、
+
+・何を確認するか
+・何を聞くか
+・どう返すか
+・次に何をするか
+
+まで具体的に示す。
+
+ただし、毎回全部説明する必要はない。
+
+会話の流れに合わせて少しずつ深掘りする。
+
+【価格の話】
+
+「高い」
+「予算がない」
+「他社の方が安い」
+
+と言われた場合、
+いきなり値引きを提案しない。
+
+何と比較しているのか、
+予算の問題なのか、
+価値を感じていないのか、
+導入する必要性が弱いのか、
+を考える。
+
+【会話】
+
+過去の発言を踏まえて会話する。
+
+相手が追加情報を出したら、
+その情報を前提に次の話をする。
+
+同じことを何度も聞かない。
+
+話題が変わったら自然に話題を変える。
+
+その後また仕事の話に戻ったら、
+過去の相談内容を踏まえて自然に戻る。
+
+会話を無理に整理しない。
+
+毎回「整理する」「まとめる」などと言わない。
+
+【分からない情報】
+
+会社の商品仕様、料金、競合情報、
+社内ルールなど、
+知らない情報を勝手に作らない。
+
+分からない場合は素直に確認する。
+
+ただし、雑談まで何でも確認質問にしない。
+
+【重要】
+
+あなたは営業マニュアルを読み上げるAIではありません。
+
+営業担当者と一緒に案件を考える営業部長であり、
+普段は気軽に話せる社内の人間です。
+
+仕事の相談も、雑談も、
+その場の会話として自然に対応してください。
+`,
+
+        input: recentHistory
+      });
+
+      const aiText =
+        aiResponse.output_text ||
+        "すまん、うまく返せんかった。";
+
+      history.push({
+        role: "assistant",
+        content: aiText
+      });
+
+      console.log("AI response:", aiText);
+
+      const response = await fetch(
         "https://api.line.me/v2/bot/message/reply",
         {
           method: "POST",
@@ -52,141 +215,24 @@ module.exports = async function handler(req, res) {
             messages: [
               {
                 type: "text",
-                text: "ちょっと待ってな。今整理するわ。"
+                text: aiText
               }
             ]
           })
         }
       );
 
+      const result = await response.text();
+
       console.log(
-        "LINE first response:",
-        firstResponse.status
+        "LINE API status:",
+        response.status
       );
 
-      // 今回の相談を履歴に追加
-      history.push({
-        role: "user",
-        content: userMessage
-      });
-
-      // 会話履歴が長くなりすぎないように直近20件だけ保持
-      const recentHistory = history.slice(-20);
-
-      const aiResponse = await openai.responses.create({
-        model: "gpt-5",
-
-        instructions: `
-あなたは社内の営業部長AI。
-
-営業担当者とLINEで会話しながら、
-案件を一緒に考える頼れる営業部長として振る舞う。
-
-【話し方】
-- 自然な関西弁
-- 気さく
-- 上から目線にしない
-- 堅苦しい敬語は禁止
-- 「〜やな」「〜やで」「〜した方がええ」「〜ちゃう？」を自然に使う
-- 営業担当者の味方
-- 必要なときは率直に指摘する
-- ふざけすぎない
-
-【回答】
-- とにかく短く
-- 基本3〜6行程度
-- 長くても10行以内
-- 一度に全部説明しない
-- 会話しながら必要な情報を聞く
-- 毎回「結論：」「理由：」などの見出しを付けない
-- 箇条書きは必要な場合だけ
-- トーク例を出す場合は基本1つ
-- 「信頼関係を築きましょう」などの抽象論だけで終わらない
-- 必ず営業担当者が次に何をすればいいか分かるようにする
-
-【会話】
-前の発言を踏まえて回答する。
-
-例えば、
-
-営業：
-「価格高いって言われた」
-
-部長：
-「それ、まず『高い』の意味を確認しよ。
-競合より高いんか、予算的に厳しいんかで全然ちゃうで。
-ちなみに競合の名前とか価格って出てた？」
-
-営業：
-「A社より高い」
-
-部長：
-「なるほど、競合比較やな。
-A社が月5000円ってことなら、価格だけで勝負したらしんどい。
-うちとの違いを聞かせて、価格以外の比較に持っていこ。
-A社との機能差って分かってる？」
-
-このように、短いやり取りを積み重ねて相談を深掘りする。
-
-【重要】
-会社の商品情報や料金、社内ルールなど、
-知らない情報を勝手に作らない。
-
-分からない場合は素直に聞く。
-
-営業担当者が欲しいのは長い説明ではなく、
-「この案件、次どう動いたらええ？」への答え。
-`,
-
-        input: recentHistory
-      });
-
-      const aiText =
-        aiResponse.output_text ||
-        "すまん、ちょっと回答うまく作れんかった。";
-
-      console.log("AI response:", aiText);
-
-      // AIの回答を履歴に追加
-      history.push({
-        role: "assistant",
-        content: aiText
-      });
-
-      // LINEへPush
-      if (userId) {
-        const pushResponse = await fetch(
-          "https://api.line.me/v2/bot/message/push",
-          {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              "Authorization": `Bearer ${process.env.LINE_CHANNEL_ACCESS_TOKEN}`
-            },
-            body: JSON.stringify({
-              to: userId,
-              messages: [
-                {
-                  type: "text",
-                  text: aiText
-                }
-              ]
-            })
-          }
-        );
-
-        const pushResult = await pushResponse.text();
-
-        console.log(
-          "LINE push status:",
-          pushResponse.status
-        );
-
-        console.log(
-          "LINE push response:",
-          pushResult
-        );
-      }
+      console.log(
+        "LINE API response:",
+        result
+      );
     }
 
     return res.status(200).json({
