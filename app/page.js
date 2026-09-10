@@ -4,21 +4,38 @@ import { useEffect, useState } from "react";
 
 export default function Home() {
   const [knowledge, setKnowledge] = useState([]);
+
   const [title, setTitle] = useState("");
   const [category, setCategory] = useState("");
   const [content, setContent] = useState("");
+
+  const [pdfFile, setPdfFile] = useState(null);
+  const [pdfTitle, setPdfTitle] = useState("");
+  const [pdfCategory, setPdfCategory] = useState("PDF");
+
   const [loading, setLoading] = useState(false);
+  const [pdfLoading, setPdfLoading] = useState(false);
 
   const loadKnowledge = async () => {
-    const res = await fetch("/api/knowledge");
-    const data = await res.json();
-    setKnowledge(data);
+    try {
+      const res = await fetch("/api/knowledge");
+      const data = await res.json();
+
+      if (Array.isArray(data)) {
+        setKnowledge(data);
+      }
+    } catch (error) {
+      console.error(error);
+    }
   };
 
   useEffect(() => {
     loadKnowledge();
   }, []);
 
+  // =========================
+  // 通常のナレッジ追加
+  // =========================
   const addKnowledge = async () => {
     if (!title || !category || !content) {
       alert("タイトル・カテゴリ・本文を全部入れてな");
@@ -27,25 +44,89 @@ export default function Home() {
 
     setLoading(true);
 
-    await fetch("/api/knowledge", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        title,
-        category,
-        content,
-      }),
-    });
+    try {
+      const res = await fetch("/api/knowledge", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          title,
+          category,
+          content,
+        }),
+      });
 
-    setTitle("");
-    setCategory("");
-    setContent("");
+      const data = await res.json();
 
-    await loadKnowledge();
+      if (!res.ok) {
+        alert(data.error || "保存に失敗しました");
+        return;
+      }
 
-    setLoading(false);
+      setTitle("");
+      setCategory("");
+      setContent("");
+
+      await loadKnowledge();
+
+      alert("ナレッジを保存したで！");
+    } catch (error) {
+      console.error(error);
+      alert("保存に失敗しました");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // =========================
+  // PDFアップロード
+  // =========================
+  const uploadPdf = async () => {
+    if (!pdfFile) {
+      alert("PDFファイルを選んでな");
+      return;
+    }
+
+    setPdfLoading(true);
+
+    try {
+      const formData = new FormData();
+
+      formData.append("file", pdfFile);
+      formData.append("title", pdfTitle || pdfFile.name);
+      formData.append("category", pdfCategory || "PDF");
+
+      const res = await fetch("/api/knowledge", {
+        method: "POST",
+        body: formData,
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        alert(data.error || "PDF登録に失敗しました");
+        return;
+      }
+
+      setPdfFile(null);
+      setPdfTitle("");
+      setPdfCategory("PDF");
+
+      const fileInput = document.getElementById("pdf-upload");
+      if (fileInput) {
+        fileInput.value = "";
+      }
+
+      await loadKnowledge();
+
+      alert("PDFをナレッジに登録したで！");
+    } catch (error) {
+      console.error(error);
+      alert("PDF登録に失敗しました");
+    } finally {
+      setPdfLoading(false);
+    }
   };
 
   return (
@@ -63,7 +144,70 @@ export default function Home() {
 
       <hr />
 
-      <h2>ナレッジ追加</h2>
+      {/* =========================
+          PDFアップロード
+      ========================= */}
+      <h2>📄 PDFからナレッジ追加</h2>
+
+      <input
+        type="text"
+        placeholder="PDFのタイトル（空欄ならファイル名）"
+        value={pdfTitle}
+        onChange={(e) => setPdfTitle(e.target.value)}
+        style={{
+          width: "100%",
+          padding: "12px",
+          marginBottom: "10px",
+          boxSizing: "border-box",
+        }}
+      />
+
+      <input
+        type="text"
+        placeholder="カテゴリ"
+        value={pdfCategory}
+        onChange={(e) => setPdfCategory(e.target.value)}
+        style={{
+          width: "100%",
+          padding: "12px",
+          marginBottom: "10px",
+          boxSizing: "border-box",
+        }}
+      />
+
+      <input
+        id="pdf-upload"
+        type="file"
+        accept=".pdf,application/pdf"
+        onChange={(e) => setPdfFile(e.target.files?.[0] || null)}
+        style={{
+          marginBottom: "10px",
+        }}
+      />
+
+      {pdfFile && (
+        <p>
+          選択中：<strong>{pdfFile.name}</strong>
+        </p>
+      )}
+
+      <button
+        onClick={uploadPdf}
+        disabled={pdfLoading}
+        style={{
+          padding: "12px 24px",
+          cursor: pdfLoading ? "not-allowed" : "pointer",
+        }}
+      >
+        {pdfLoading ? "PDF処理中..." : "PDFを登録"}
+      </button>
+
+      <hr />
+
+      {/* =========================
+          通常のナレッジ追加
+      ========================= */}
+      <h2>📝 ナレッジ追加</h2>
 
       <input
         type="text"
@@ -109,7 +253,7 @@ export default function Home() {
         disabled={loading}
         style={{
           padding: "12px 24px",
-          cursor: "pointer",
+          cursor: loading ? "not-allowed" : "pointer",
         }}
       >
         {loading ? "保存中..." : "ナレッジを保存"}
@@ -117,7 +261,10 @@ export default function Home() {
 
       <hr />
 
-      <h2>登録済みナレッジ</h2>
+      {/* =========================
+          登録済みナレッジ
+      ========================= */}
+      <h2>📚 登録済みナレッジ</h2>
 
       {knowledge.length === 0 && (
         <p>まだナレッジは登録されてへん。</p>
@@ -140,7 +287,13 @@ export default function Home() {
             {item.category}
           </p>
 
-          <p style={{ whiteSpace: "pre-wrap" }}>
+          <p
+            style={{
+              whiteSpace: "pre-wrap",
+              maxHeight: "300px",
+              overflow: "auto",
+            }}
+          >
             {item.content}
           </p>
         </div>
