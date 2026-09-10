@@ -1,5 +1,4 @@
 import { createClient } from "@supabase/supabase-js";
-import { PDFParse } from "pdf-parse";
 
 const supabase = createClient(
   process.env.SUPABASE_URL,
@@ -8,19 +7,26 @@ const supabase = createClient(
 
 // ナレッジ一覧取得
 export async function GET() {
-  const { data, error } = await supabase
-    .from("knowledge")
-    .select("*")
-    .order("created_at", { ascending: false });
+  try {
+    const { data, error } = await supabase
+      .from("knowledge")
+      .select("*")
+      .order("created_at", { ascending: false });
 
-  if (error) {
+    if (error) {
+      return Response.json(
+        { error: error.message },
+        { status: 500 }
+      );
+    }
+
+    return Response.json(data);
+  } catch (error) {
     return Response.json(
       { error: error.message },
       { status: 500 }
     );
   }
-
-  return Response.json(data);
 }
 
 // ナレッジ追加
@@ -56,25 +62,6 @@ export async function POST(request) {
       const buffer = Buffer.from(arrayBuffer);
 
       // =========================
-      // PDF本文を抽出
-      // =========================
-      const parser = new PDFParse({
-        data: buffer,
-      });
-
-      const parsed = await parser.getText();
-      await parser.destroy();
-
-      const extractedText = parsed.text;
-
-      if (!extractedText || !extractedText.trim()) {
-        return Response.json(
-          { error: "PDFから本文を読み取れませんでした。" },
-          { status: 400 }
-        );
-      }
-
-      // =========================
       // Supabase Storageへ保存
       // =========================
       const fileName =
@@ -97,33 +84,11 @@ export async function POST(request) {
       }
 
       // =========================
-      // 抽出した本文をknowledgeへ保存
+      // まずはStorage登録成功だけ確認
       // =========================
-      const { data, error: insertError } = await supabase
-        .from("knowledge")
-        .insert([
-          {
-            title: title || file.name,
-            category: category || "PDF",
-            content: extractedText,
-          },
-        ])
-        .select()
-        .single();
-
-      if (insertError) {
-        return Response.json(
-          {
-            error: `ナレッジ保存に失敗しました: ${insertError.message}`,
-          },
-          { status: 500 }
-        );
-      }
-
       return Response.json({
         success: true,
-        message: "PDFを登録しました。",
-        knowledge: data,
+        message: "PDFをStorageに保存しました。",
         fileName,
       });
     }
