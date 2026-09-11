@@ -1,5 +1,7 @@
 import { createClient } from "@supabase/supabase-js";
-import { PDFParse } from "pdf-parse";
+import { extractText, getDocumentProxy } from "unpdf";
+
+export const runtime = "nodejs";
 
 const supabase = createClient(
   process.env.SUPABASE_URL,
@@ -95,7 +97,6 @@ export async function POST(request) {
 
       // ==================================================
       // Storage保存用ファイル名
-      // 元のファイル名は使わない
       // ==================================================
       const fileName = `${Date.now()}_upload.pdf`;
 
@@ -137,22 +138,36 @@ export async function POST(request) {
       // ==================================================
       // ② PDFから文字を抽出
       // ==================================================
-      let parser;
+      let pdf;
 
       try {
-        parser = new PDFParse({
-          data: buffer,
+        pdf = await getDocumentProxy(
+          new Uint8Array(buffer)
+        );
+
+        const result = await extractText(pdf, {
+          mergePages: true,
         });
 
-        const parsed = await parser.getText();
-
-        const extractedText = parsed?.text || "";
+        const extractedText = result.text || "";
 
         console.log(
-          "PDF文字抽出成功。文字数:",
+          "PDF文字抽出成功"
+        );
+
+        console.log(
+          "ページ数:",
+          result.totalPages
+        );
+
+        console.log(
+          "文字数:",
           extractedText.length
         );
 
+        // --------------------------
+        // 文字が取れなかった場合
+        // --------------------------
         if (!extractedText.trim()) {
           return Response.json(
             {
@@ -224,17 +239,18 @@ export async function POST(request) {
           message: "PDFをナレッジに登録しました。",
           fileName,
           knowledgeId: knowledgeData.id,
+          totalPages: result.totalPages,
           textLength: extractedText.length,
         });
 
       } finally {
-        if (parser) {
+        if (pdf) {
           try {
-            await parser.destroy();
-          } catch (destroyError) {
+            await pdf.destroy();
+          } catch (error) {
             console.error(
-              "PDF parser destroy error:",
-              destroyError
+              "PDF destroy error:",
+              error
             );
           }
         }
