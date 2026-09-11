@@ -9,6 +9,6 @@
     "next": "latest",
     "openai": "latest",
     "@supabase/supabase-js": "latest",
-    "pdf-parse": "latest"
+    "unpdf": "1.8.1"
   }
 }
