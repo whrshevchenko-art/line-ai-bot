@@ -674,33 +674,6 @@ async function loadEmployees() {
     setEmployeeLoading(false);
   }
 }
-      );
-
-const data = await response.json();
-
-console.log("EMPLOYEE API DATA:", data);
-console.log("EMPLOYEE API DATA TYPE:", typeof data);
-console.log("IS ARRAY:", Array.isArray(data));
-console.log("EMPLOYEES:", data?.employees);
-
-      if (!response.ok) {
-        throw new Error(
-          data?.error ||
-            "社員情報の取得に失敗しました。"
-        );
-      }
-
-const employeeList = Array.isArray(data)
-  ? data
-  : Array.isArray(data?.employees)
-    ? data.employees
-    : [];
-
-const activeEmployees = employeeList.filter(
-  (item) =>
-    item.active !== false &&
-    item.quest_enabled !== false
-);
       
 console.log("冒険者データ:", activeEmployees);
       setEmployees(activeEmployees);
