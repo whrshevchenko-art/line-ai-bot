@@ -643,9 +643,12 @@ export default function SalesQuestPage() {
         }
       );
 
-      const data = await response
-        .json()
-        .catch(() => []);
+const data = await response.json();
+
+console.log("EMPLOYEE API DATA:", data);
+console.log("EMPLOYEE API DATA TYPE:", typeof data);
+console.log("IS ARRAY:", Array.isArray(data));
+console.log("EMPLOYEES:", data?.employees);
 
       if (!response.ok) {
         throw new Error(
