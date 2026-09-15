@@ -654,13 +654,18 @@ export default function SalesQuestPage() {
         );
       }
 
-      const activeEmployees = Array.isArray(data)
-        ? data.filter(
-            (item) =>
-              item.active !== false &&
-              item.quest_enabled !== false
-          )
-        : [];
+const employeeList = Array.isArray(data)
+  ? data
+  : Array.isArray(data?.employees)
+    ? data.employees
+    : [];
+
+const activeEmployees = employeeList.filter(
+  (item) =>
+    item.active !== false &&
+    item.quest_enabled !== false
+);
+      
 console.log("冒険者データ:", activeEmployees);
       setEmployees(activeEmployees);
     } catch (e) {
