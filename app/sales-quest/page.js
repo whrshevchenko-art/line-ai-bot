@@ -661,7 +661,7 @@ export default function SalesQuestPage() {
               item.quest_enabled !== false
           )
         : [];
-
+console.log("冒険者データ:", activeEmployees);
       setEmployees(activeEmployees);
     } catch (e) {
       setError(e.message);
