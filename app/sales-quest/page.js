@@ -631,7 +631,7 @@ export default function SalesQuestPage() {
     });
   }, [messages, loading]);
 
-  async function loadEmployees() {
+async function loadEmployees() {
   setEmployeeLoading(true);
 
   try {
@@ -673,6 +673,7 @@ export default function SalesQuestPage() {
   } finally {
     setEmployeeLoading(false);
   }
+}
       );
 
 const data = await response.json();
