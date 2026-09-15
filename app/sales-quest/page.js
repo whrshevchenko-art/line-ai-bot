@@ -674,100 +674,90 @@ async function loadEmployees() {
     setEmployeeLoading(false);
   }
 }
-      
-console.log("冒険者データ:", activeEmployees);
-      setEmployees(activeEmployees);
-    } catch (e) {
-      setError(e.message);
-    } finally {
-      setEmployeeLoading(false);
+
+async function loadStats(employeeId) {
+  try {
+    /*
+     * 現在のstart APIがuserIdを受け取って
+     * statsを返すため、ここでは直接取得せず
+     * ログイン後にQUEST STARTした際に更新する。
+     *
+     * 既存データとの互換性も維持。
+     */
+    if (!employeeId) {
+      return;
     }
+  } catch {
+    // stats取得失敗時は初期値を使用
+  }
+}
+
+function selectEmployee(selected) {
+  setEmployee(selected);
+  setUserId(selected.id);
+  setEmployeeSearch("");
+  setError("");
+
+  try {
+    window.localStorage.setItem(
+      getEmployeeStorageKey(),
+      JSON.stringify(selected)
+    );
+  } catch {
+    // 保存できなくてもゲーム自体は続行
   }
 
-  async function loadStats(employeeId) {
-    try {
-      /*
-       * 現在のstart APIがuserIdを受け取って
-       * statsを返すため、ここでは直接取得せず
-       * ログイン後にQUEST STARTした際に更新する。
-       *
-       * 既存データとの互換性も維持。
-       */
-      if (!employeeId) {
-        return;
-      }
-    } catch {
-      // stats取得失敗時は初期値を使用
-    }
+  loadStats(selected.id);
+}
+
+function logout() {
+  setEmployee(null);
+  setUserId("");
+  setSession(null);
+  setMessages([]);
+  setResult(null);
+  setInput("");
+  setError("");
+  setPsychologyHint("");
+  setCustomerState(normalizeState());
+
+  setStats({
+    level: 1,
+    exp: 0,
+    average_score: 0,
+    best_score: 0,
+  });
+
+  try {
+    window.localStorage.removeItem(
+      getEmployeeStorageKey()
+    );
+  } catch {
+    // noop
+  }
+}
+
+async function request(url, body) {
+  const response = await fetch(url, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(body),
+  });
+
+  const data = await response
+    .json()
+    .catch(() => ({}));
+
+  if (!response.ok) {
+    throw new Error(
+      data.error || "通信に失敗しました。"
+    );
   }
 
-  function selectEmployee(selected) {
-    setEmployee(selected);
-    setUserId(selected.id);
-    setEmployeeSearch("");
-    setError("");
-
-    try {
-      window.localStorage.setItem(
-        getEmployeeStorageKey(),
-        JSON.stringify(selected)
-      );
-    } catch {
-      // 保存できなくてもゲーム自体は続行
-    }
-
-    loadStats(selected.id);
-  }
-
-  function logout() {
-    setEmployee(null);
-    setUserId("");
-    setSession(null);
-    setMessages([]);
-    setResult(null);
-    setInput("");
-    setError("");
-    setPsychologyHint("");
-    setCustomerState(normalizeState());
-
-    setStats({
-      level: 1,
-      exp: 0,
-      average_score: 0,
-      best_score: 0,
-    });
-
-    try {
-      window.localStorage.removeItem(
-        getEmployeeStorageKey()
-      );
-    } catch {
-      // noop
-    }
-  }
-
-  async function request(url, body) {
-    const response = await fetch(url, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(body),
-    });
-
-    const data = await response
-      .json()
-      .catch(() => ({}));
-
-    if (!response.ok) {
-      throw new Error(
-        data.error || "通信に失敗しました。"
-      );
-    }
-
-    return data;
-  }
-
+  return data;
+}
   async function start() {
     if (!userId) {
       return;
