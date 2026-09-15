@@ -3,16 +3,28 @@ import { extractText, getDocumentProxy } from "unpdf";
 
 export const runtime = "nodejs";
 
-const supabase = createClient(
-  process.env.SUPABASE_URL,
-  process.env.SUPABASE_SERVICE_ROLE_KEY
-);
+function getSupabase() {
+  const url = process.env.SUPABASE_URL;
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+  if (!url) {
+    throw new Error("SUPABASE_URL is not configured.");
+  }
+
+  if (!key) {
+    throw new Error("SUPABASE_SERVICE_ROLE_KEY is not configured.");
+  }
+
+  return createClient(url, key);
+}
 
 // =========================
 // ナレッジ一覧取得
 // =========================
 export async function GET() {
   try {
+    const supabase = getSupabase();
+
     const { data, error } = await supabase
       .from("knowledge")
       .select("*")
@@ -49,6 +61,8 @@ export async function GET() {
 // =========================
 export async function POST(request) {
   try {
+    const supabase = getSupabase();
+
     const contentType = request.headers.get("content-type") || "";
 
     // ==================================================
@@ -151,19 +165,9 @@ export async function POST(request) {
 
         const extractedText = result.text || "";
 
-        console.log(
-          "PDF文字抽出成功"
-        );
-
-        console.log(
-          "ページ数:",
-          result.totalPages
-        );
-
-        console.log(
-          "文字数:",
-          extractedText.length
-        );
+        console.log("PDF文字抽出成功");
+        console.log("ページ数:", result.totalPages);
+        console.log("文字数:", extractedText.length);
 
         // --------------------------
         // 文字が取れなかった場合
@@ -194,18 +198,20 @@ export async function POST(request) {
             ? category.trim()
             : "PDF";
 
-        const { data: knowledgeData, error: knowledgeError } =
-          await supabase
-            .from("knowledge")
-            .insert([
-              {
-                title: knowledgeTitle,
-                category: knowledgeCategory,
-                content: extractedText,
-              },
-            ])
-            .select()
-            .single();
+        const {
+          data: knowledgeData,
+          error: knowledgeError,
+        } = await supabase
+          .from("knowledge")
+          .insert([
+            {
+              title: knowledgeTitle,
+              category: knowledgeCategory,
+              content: extractedText,
+            },
+          ])
+          .select()
+          .single();
 
         if (knowledgeError) {
           console.error(
@@ -242,7 +248,6 @@ export async function POST(request) {
           totalPages: result.totalPages,
           textLength: extractedText.length,
         });
-
       } finally {
         if (pdf) {
           try {
@@ -304,7 +309,6 @@ export async function POST(request) {
     }
 
     return Response.json(data);
-
   } catch (error) {
     console.error(
       "knowledge API error:",
