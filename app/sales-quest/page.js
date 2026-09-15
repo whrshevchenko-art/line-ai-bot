@@ -43,31 +43,137 @@ const stateLabels = {
   },
 };
 
-function getUserId() {
-  const key = "sales-quest-user-id";
-  let id = window.localStorage.getItem(key);
-
-  if (!id) {
-    id = crypto.randomUUID();
-    window.localStorage.setItem(key, id);
-  }
-
-  return id;
-}
-
 function normalizeState(state = {}) {
   return {
     trust: Number(state.trust ?? 25),
-    problem_awareness: Number(state.problem_awareness ?? 15),
-    gap_awareness: Number(state.gap_awareness ?? 5),
+    problem_awareness: Number(
+      state.problem_awareness ?? 15
+    ),
+    gap_awareness: Number(
+      state.gap_awareness ?? 5
+    ),
     urgency: Number(state.urgency ?? 10),
     interest: Number(state.interest ?? 10),
     resistance: Number(state.resistance ?? 35),
   };
 }
 
+function getDifficulty(level) {
+  const lv = Number(level || 1);
+
+  if (lv >= 10) {
+    return {
+      name: "魔王級",
+      icon: "👹",
+      color: "red",
+      description: "攻略情報なし。顧客の心理だけを読め。",
+    };
+  }
+
+  if (lv >= 6) {
+    return {
+      name: "上級",
+      icon: "⚔️",
+      color: "gold",
+      description: "ヒントは最小限。自力でGAPを作れ。",
+    };
+  }
+
+  if (lv >= 3) {
+    return {
+      name: "中級",
+      icon: "🛡️",
+      color: "blue",
+      description: "基本を意識しながら自力で攻略。",
+    };
+  }
+
+  return {
+    name: "初級",
+    icon: "🌱",
+    color: "green",
+    description: "営業の基本を学びながら攻略。",
+  };
+}
+
+function getTitle(level) {
+  const lv = Number(level || 1);
+
+  if (lv >= 20) return "営業大魔王";
+  if (lv >= 15) return "伝説の営業";
+  if (lv >= 10) return "営業魔王";
+  if (lv >= 8) return "トップセールス";
+  if (lv >= 6) return "エース営業";
+  if (lv >= 4) return "一人前営業";
+  if (lv >= 3) return "見習い卒業";
+  if (lv >= 2) return "見習い営業";
+
+  return "新人営業";
+}
+
+function getTip(level) {
+  if (level <= 1) {
+    return {
+      title: "まずは現状を聞こう",
+      text:
+        "いきなりHPを提案するより、まず顧客の現状・数字・困っていることを聞いてみましょう。",
+    };
+  }
+
+  if (level === 2) {
+    return {
+      title: "現状と理想を比べよう",
+      text:
+        "「今どうなっているか」と「本当はどうなりたいか」を聞くと、GAPが見えてきます。",
+    };
+  }
+
+  if (level === 3) {
+    return {
+      title: "数字を使って深掘り",
+      text:
+        "新規客数や単価などを聞いて、顧客自身にGAPの大きさを認識してもらいましょう。",
+    };
+  }
+
+  if (level === 4) {
+    return {
+      title: "GAPを未来につなげる",
+      text:
+        "GAPが埋まったら何が変わるのか。店舗の未来や理想まで掘り下げてみましょう。",
+    };
+  }
+
+  if (level <= 5) {
+    return {
+      title: "顧客に気づかせろ",
+      text:
+        "答えを先に言うのではなく、顧客自身が「ここを改善したい」と気づく質問を選びましょう。",
+    };
+  }
+
+  if (level <= 9) {
+    return {
+      title: "GAPを作れ",
+      text:
+        "数字・理想・未来をつなげて、顧客自身に「このままではもったいない」と気づかせましょう。",
+    };
+  }
+
+  return {
+    title: "自分で考えろ",
+    text:
+      "魔王級に攻略情報はない。顧客の反応を見て、次の一手を判断しましょう。",
+  };
+}
+
+function getEmployeeStorageKey() {
+  return "sales-quest-employee";
+}
+
 function StateBar({ type, value }) {
   const config = stateLabels[type];
+
   const safeValue = Math.max(
     0,
     Math.min(100, Number(value) || 0)
@@ -232,48 +338,249 @@ function CustomerInfo({ customer }) {
   );
 }
 
-function getTip(level) {
-  if (level <= 1) {
-    return {
-      title: "まずは現状を聞こう",
-      text:
-        "いきなりHPを提案するより、まず顧客の現状・数字・困っていることを聞いてみましょう。",
-    };
-  }
+function QuestBoard({
+  stats,
+  employee,
+  onStart,
+  loading,
+  onLogout,
+}) {
+  const difficulty = getDifficulty(stats.level);
+  const tip = getTip(stats.level);
 
-  if (level === 2) {
-    return {
-      title: "現状と理想を比べよう",
-      text:
-        "「今どうなっているか」と「本当はどうなりたいか」を聞くと、GAPが見えてきます。",
-    };
-  }
+  const exp = Number(stats.exp || 0);
+  const expInLevel = exp % 100;
 
-  if (level === 3) {
-    return {
-      title: "数字を使って深掘り",
-      text:
-        "新規客数や単価などを聞いて、顧客自身にGAPの大きさを認識してもらいましょう。",
-    };
-  }
+  return (
+    <section className="boardPage">
+      <div className="heroTop">
+        <div>
+          <p className="eyebrow">
+            ADVENTURER&apos;S GUILD
+          </p>
 
-  if (level === 4) {
-    return {
-      title: "GAPを未来につなげる",
-      text:
-        "GAPが埋まったら何が変わるのか。店舗の未来や理想まで掘り下げてみましょう。",
-    };
-  }
+          <h2>冒険者の城</h2>
 
-  return {
-    title: "顧客に気づかせろ",
-    text:
-      "答えを先に言うのではなく、顧客自身が「ここを改善したい」と気づく質問を選びましょう。",
-  };
+          <p className="heroLead">
+            ようこそ、{employee.name}。
+            <br />
+            今日も営業という名のダンジョンへ。
+          </p>
+        </div>
+
+        <button
+          className="logoutButton"
+          onClick={onLogout}
+        >
+          ↪ 冒険者を変更
+        </button>
+      </div>
+
+      <div className="adventurerCard">
+        <div className="avatar">
+          {employee.name?.slice(0, 1) || "冒"}
+        </div>
+
+        <div className="adventurerMain">
+          <div className="adventurerName">
+            {employee.name}
+          </div>
+
+          <div className="title">
+            {getTitle(stats.level)}
+          </div>
+
+          <div className="expRow">
+            <span>
+              LEVEL {stats.level}
+            </span>
+
+            <span>
+              {expInLevel} / 100 EXP
+            </span>
+          </div>
+
+          <div className="expBar">
+            <i
+              style={{
+                width: `${expInLevel}%`,
+              }}
+            />
+          </div>
+        </div>
+
+        <div className="levelBadge">
+          <small>営業</small>
+          <strong>{stats.level}</strong>
+          <span>LV</span>
+        </div>
+      </div>
+
+      <div className="boardGrid">
+        <div className="questBoard">
+          <div className="sectionTitle">
+            <div>
+              <span className="sectionIcon">
+                📜
+              </span>
+
+              <div>
+                <small>QUEST BOARD</small>
+                <h3>依頼掲示板</h3>
+              </div>
+            </div>
+
+            <span className="available">
+              ● AVAILABLE
+            </span>
+          </div>
+
+          <div className="questCard active">
+            <div className="questIcon">
+              ⚔️
+            </div>
+
+            <div className="questContent">
+              <div className="questMeta">
+                <span>STAGE 1</span>
+                <span>
+                  {difficulty.icon}{" "}
+                  {difficulty.name}
+                </span>
+              </div>
+
+              <h3>
+                興味なし → 興味あり
+              </h3>
+
+              <p>
+                警戒している店舗オーナーから、
+                「もう少し詳しく聞きたい」を
+                引き出せ。
+              </p>
+
+              <div className="questObjective">
+                <span>🎯 目標</span>
+                <strong>
+                  顧客にHPについて詳しく聞きたい
+                  と言わせる
+                </strong>
+              </div>
+
+              <button
+                className="questStart"
+                disabled={loading}
+                onClick={onStart}
+              >
+                {loading
+                  ? "顧客を召喚中..."
+                  : "▶ QUEST START"}
+              </button>
+            </div>
+          </div>
+
+          <div className="lockedQuest">
+            <span>🔒</span>
+
+            <div>
+              <strong>
+                STAGE 2　？？？
+              </strong>
+
+              <small>
+                STAGE 1をクリアすると解放されます
+              </small>
+            </div>
+          </div>
+
+          <div className="lockedQuest">
+            <span>🔒</span>
+
+            <div>
+              <strong>
+                STAGE 3　？？？
+              </strong>
+
+              <small>
+                さらなる営業の試練
+              </small>
+            </div>
+          </div>
+        </div>
+
+        <aside className="guildSide">
+          <div className="guildCard">
+            <div className="sectionTitle compact">
+              <div>
+                <span className="sectionIcon">
+                  🏆
+                </span>
+
+                <div>
+                  <small>ADVENTURER</small>
+                  <h3>冒険者情報</h3>
+                </div>
+              </div>
+            </div>
+
+            <div className="guildStats">
+              <div>
+                <span>平均スコア</span>
+                <strong>
+                  {stats.average_score || "-"}
+                </strong>
+              </div>
+
+              <div>
+                <span>最高スコア</span>
+                <strong>
+                  {stats.best_score || "-"}
+                </strong>
+              </div>
+
+              <div>
+                <span>累計EXP</span>
+                <strong>{exp}</strong>
+              </div>
+            </div>
+          </div>
+
+          <div className="tipCard">
+            <span>💡 GUILD TIP</span>
+
+            <strong>{tip.title}</strong>
+
+            <p>{tip.text}</p>
+          </div>
+
+          <div className="difficultyCard">
+            <span>⚔️ CURRENT DIFFICULTY</span>
+
+            <strong>
+              {difficulty.icon}{" "}
+              {difficulty.name}
+            </strong>
+
+            <p>
+              {difficulty.description}
+            </p>
+          </div>
+        </aside>
+      </div>
+    </section>
+  );
 }
 
 export default function SalesQuestPage() {
+  const [employees, setEmployees] = useState([]);
+  const [employee, setEmployee] = useState(null);
+  const [employeeSearch, setEmployeeSearch] =
+    useState("");
+  const [employeeLoading, setEmployeeLoading] =
+    useState(true);
+
   const [userId, setUserId] = useState("");
+
   const [session, setSession] = useState(null);
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState("");
@@ -297,7 +604,25 @@ export default function SalesQuestPage() {
   const endRef = useRef(null);
 
   useEffect(() => {
-    setUserId(getUserId());
+    loadEmployees();
+
+    try {
+      const saved =
+        window.localStorage.getItem(
+          getEmployeeStorageKey()
+        );
+
+      if (saved) {
+        const parsed = JSON.parse(saved);
+
+        if (parsed?.id) {
+          setEmployee(parsed);
+          setUserId(parsed.id);
+        }
+      }
+    } catch {
+      // localStorageが壊れていても画面は起動する
+    }
   }, []);
 
   useEffect(() => {
@@ -305,6 +630,107 @@ export default function SalesQuestPage() {
       behavior: "smooth",
     });
   }, [messages, loading]);
+
+  async function loadEmployees() {
+    setEmployeeLoading(true);
+
+    try {
+      const response = await fetch(
+        "/api/employees",
+        {
+          method: "GET",
+          cache: "no-store",
+        }
+      );
+
+      const data = await response
+        .json()
+        .catch(() => []);
+
+      if (!response.ok) {
+        throw new Error(
+          data?.error ||
+            "社員情報の取得に失敗しました。"
+        );
+      }
+
+      const activeEmployees = Array.isArray(data)
+        ? data.filter(
+            (item) =>
+              item.active !== false &&
+              item.quest_enabled !== false
+          )
+        : [];
+
+      setEmployees(activeEmployees);
+    } catch (e) {
+      setError(e.message);
+    } finally {
+      setEmployeeLoading(false);
+    }
+  }
+
+  async function loadStats(employeeId) {
+    try {
+      /*
+       * 現在のstart APIがuserIdを受け取って
+       * statsを返すため、ここでは直接取得せず
+       * ログイン後にQUEST STARTした際に更新する。
+       *
+       * 既存データとの互換性も維持。
+       */
+      if (!employeeId) {
+        return;
+      }
+    } catch {
+      // stats取得失敗時は初期値を使用
+    }
+  }
+
+  function selectEmployee(selected) {
+    setEmployee(selected);
+    setUserId(selected.id);
+    setEmployeeSearch("");
+    setError("");
+
+    try {
+      window.localStorage.setItem(
+        getEmployeeStorageKey(),
+        JSON.stringify(selected)
+      );
+    } catch {
+      // 保存できなくてもゲーム自体は続行
+    }
+
+    loadStats(selected.id);
+  }
+
+  function logout() {
+    setEmployee(null);
+    setUserId("");
+    setSession(null);
+    setMessages([]);
+    setResult(null);
+    setInput("");
+    setError("");
+    setPsychologyHint("");
+    setCustomerState(normalizeState());
+
+    setStats({
+      level: 1,
+      exp: 0,
+      average_score: 0,
+      best_score: 0,
+    });
+
+    try {
+      window.localStorage.removeItem(
+        getEmployeeStorageKey()
+      );
+    } catch {
+      // noop
+    }
+  }
 
   async function request(url, body) {
     const response = await fetch(url, {
@@ -329,6 +755,10 @@ export default function SalesQuestPage() {
   }
 
   async function start() {
+    if (!userId) {
+      return;
+    }
+
     setLoading(true);
     setError("");
     setResult(null);
@@ -343,7 +773,14 @@ export default function SalesQuestPage() {
       );
 
       setSession(data.session);
-      setStats(data.stats);
+      setStats(
+        data.stats || {
+          level: 1,
+          exp: 0,
+          average_score: 0,
+          best_score: 0,
+        }
+      );
 
       setCustomerState(
         normalizeState(
@@ -415,7 +852,9 @@ export default function SalesQuestPage() {
 
       if (data.customer_state) {
         setCustomerState(
-          normalizeState(data.customer_state)
+          normalizeState(
+            data.customer_state
+          )
         );
       }
 
@@ -468,10 +907,36 @@ export default function SalesQuestPage() {
     setCustomerState(normalizeState());
   }
 
+  const filteredEmployees =
+    employees.filter((item) => {
+      const keyword =
+        employeeSearch.trim().toLowerCase();
+
+      if (!keyword) {
+        return true;
+      }
+
+      return [
+        item.name,
+        item.department,
+        item.office,
+      ]
+        .filter(Boolean)
+        .some((value) =>
+          String(value)
+            .toLowerCase()
+            .includes(keyword)
+        );
+    });
+
   const expInLevel =
     Number(stats.exp || 0) % 100;
 
   const currentTip = getTip(
+    Number(stats.level || 1)
+  );
+
+  const difficulty = getDifficulty(
     Number(stats.level || 1)
   );
 
@@ -482,9 +947,11 @@ export default function SalesQuestPage() {
           box-sizing: border-box;
         }
 
+        html,
         body {
           margin: 0;
-          background: #090d18;
+          padding: 0;
+          background: #080b15;
           color: #edf1ff;
           font-family:
             -apple-system,
@@ -493,6 +960,10 @@ export default function SalesQuestPage() {
             "Hiragino Kaku Gothic ProN",
             Meiryo,
             sans-serif;
+        }
+
+        body {
+          min-height: 100vh;
         }
 
         button,
@@ -506,13 +977,15 @@ export default function SalesQuestPage() {
       `}</style>
 
       <section className="shell">
-        <header>
+        <header className="header">
           <a href="/" className="back">
-            ← AI部長に戻る
+            ← AI部長
           </a>
 
           <div className="brand">
-            <span>⚔</span>
+            <div className="brandIcon">
+              ⚔️
+            </div>
 
             <div>
               <small>
@@ -523,120 +996,182 @@ export default function SalesQuestPage() {
             </div>
           </div>
 
-          <div className="levelBox">
-            <div className="levelTitle">
-              <span>営業 Lv.{stats.level}</span>
+          {employee && (
+            <div className="headerPlayer">
+              <div className="headerAvatar">
+                {employee.name?.slice(0, 1)}
+              </div>
 
-              <small>
-                {stats.level <= 1
-                  ? "新人営業"
-                  : stats.level === 2
-                  ? "見習い営業"
-                  : stats.level === 3
-                  ? "一人前営業"
-                  : stats.level === 4
-                  ? "エース営業"
-                  : "営業魔王"}
-              </small>
+              <div>
+                <strong>
+                  {employee.name}
+                </strong>
+
+                <span>
+                  Lv.{stats.level}{" "}
+                  {getTitle(stats.level)}
+                </span>
+              </div>
             </div>
-
-            <div className="bar">
-              <i
-                style={{
-                  width: `${expInLevel}%`,
-                }}
-              />
-            </div>
-
-            <small className="expText">
-              {expInLevel} / 100 EXP
-            </small>
-          </div>
+          )}
         </header>
 
         {error && (
           <div className="error">
+            <span>⚠️</span>
             {error}
           </div>
         )}
 
-        {!session && !result && (
-          <section className="startCard">
+        {!employee && (
+          <section className="loginScreen">
+            <div className="castle">
+              <div className="castleGlow" />
+              <div className="castleEmoji">
+                🏰
+              </div>
+            </div>
+
             <p className="eyebrow">
-              STAGE 1
+              SALES ADVENTURE
             </p>
 
             <h2>
-              興味なし → 興味あり
+              営業の冒険へ
+              <br />
+              ようこそ。
             </h2>
 
-            <p className="lead">
-              警戒している店舗オーナーから、
-              「もう少し詳しく聞きたい」を
-              引き出しましょう。
+            <p className="loginLead">
+              冒険者を選択してください。
               <br />
-              正解の選択肢はありません。
-              自由に営業してください。
+              パスワード？そんなものはない。
+              社内だからな。
             </p>
 
-            <div className="rules">
-              <span>🎯 課題を聞き出す</span>
-              <span>🔢 数字で状況を捉える</span>
-              <span>📐 GAPを作る</span>
-              <span>💬 興味を引き出す</span>
-            </div>
+            <div className="loginPanel">
+              <div className="loginPanelHeader">
+                <div>
+                  <small>
+                    ADVENTURER SELECT
+                  </small>
 
-            <div className="startTip">
-              <span>💡 BEGINNER TIP</span>
+                  <strong>
+                    冒険者を選択
+                  </strong>
+                </div>
 
-              <strong>
-                {currentTip.title}
-              </strong>
-
-              <p>{currentTip.text}</p>
-            </div>
-
-            <button
-              className="primary"
-              disabled={!userId || loading}
-              onClick={start}
-            >
-              {loading
-                ? "顧客を準備中..."
-                : "QUEST START"}
-            </button>
-
-            <div className="miniStats">
-              <div>
-                <b>
-                  {stats.average_score || "-"}
-                </b>
-
-                <small>
-                  平均スコア
-                </small>
+                <span>
+                  👥 {employees.length}名
+                </span>
               </div>
 
-              <div>
-                <b>
-                  {stats.best_score || "-"}
-                </b>
+              <div className="searchBox">
+                <span>🔎</span>
 
-                <small>
-                  最高スコア
-                </small>
+                <input
+                  value={employeeSearch}
+                  onChange={(e) =>
+                    setEmployeeSearch(
+                      e.target.value
+                    )
+                  }
+                  placeholder="名前・部署・拠点を検索..."
+                  autoComplete="off"
+                />
+              </div>
+
+              <div className="employeeList">
+                {employeeLoading ? (
+                  <div className="empty">
+                    <span className="loadingOrb">
+                      ✦
+                    </span>
+
+                    <p>
+                      冒険者名簿を読み込み中...
+                    </p>
+                  </div>
+                ) : filteredEmployees.length ===
+                  0 ? (
+                  <div className="empty">
+                    <span>📜</span>
+
+                    <p>
+                      冒険者が見つかりません
+                    </p>
+                  </div>
+                ) : (
+                  filteredEmployees.map(
+                    (item) => (
+                      <button
+                        key={item.id}
+                        className="employeeRow"
+                        onClick={() =>
+                          selectEmployee(item)
+                        }
+                      >
+                        <div className="employeeAvatar">
+                          {item.name?.slice(
+                            0,
+                            1
+                          )}
+                        </div>
+
+                        <div className="employeeInfo">
+                          <strong>
+                            {item.name}
+                          </strong>
+
+                          <span>
+                            {item.department ||
+                              "営業部"}
+
+                            {item.office
+                              ? ` ・ ${item.office}`
+                              : ""}
+                          </span>
+                        </div>
+
+                        <span className="arrow">
+                          →
+                        </span>
+                      </button>
+                    )
+                  )
+                )}
               </div>
             </div>
           </section>
         )}
 
+        {employee &&
+          !session &&
+          !result && (
+            <QuestBoard
+              stats={stats}
+              employee={employee}
+              onStart={start}
+              loading={loading}
+              onLogout={logout}
+            />
+          )}
+
         {session && !result && (
           <section className="quest">
             <div className="questHead">
               <div>
-                <p className="eyebrow">
-                  STAGE 1 / LIVE ROLEPLAY
-                </p>
+                <div className="questBreadcrumb">
+                  <span>
+                    STAGE 1
+                  </span>
+
+                  <span>›</span>
+
+                  <span>
+                    LIVE ROLEPLAY
+                  </span>
+                </div>
 
                 <h2>
                   {session.customer.industry}
@@ -645,20 +1180,45 @@ export default function SalesQuestPage() {
 
                 <p>
                   {session.customer.business_size}
-                  ・
+                  {" ・ "}
                   {session.customer.owner_type}
                 </p>
               </div>
 
-              <div
-                className={`status ${session.status}`}
-              >
-                {session.status === "cleared"
-                  ? "興味あり！"
-                  : session.status === "failed"
-                  ? "会話終了"
-                  : "商談中"}
+              <div className="battleStatus">
+                <span className="difficultyMini">
+                  {difficulty.icon}{" "}
+                  {difficulty.name}
+                </span>
+
+                <div
+                  className={`status ${session.status}`}
+                >
+                  {session.status ===
+                  "cleared"
+                    ? "QUEST CLEAR"
+                    : session.status ===
+                      "failed"
+                    ? "会話終了"
+                    : "⚔ 商談中"}
+                </div>
               </div>
+            </div>
+
+            <div className="battleMission">
+              <span>
+                🎯 MISSION
+              </span>
+
+              <strong>
+                顧客から
+                「ホームページについて詳しく聞きたい」
+                を引き出せ
+              </strong>
+
+              <small>
+                GBP → 現状 → 理想 → GAP → HP
+              </small>
             </div>
 
             <div className="battleLayout">
@@ -670,11 +1230,11 @@ export default function SalesQuestPage() {
                         className={`message ${item.role}`}
                         key={index}
                       >
-                        <span>
+                        <div className="messageName">
                           {item.role === "user"
-                            ? "あなた"
-                            : "顧客"}
-                        </span>
+                            ? `🧙 ${employee.name}`
+                            : "👤 顧客"}
+                        </div>
 
                         <p>
                           {item.content}
@@ -685,12 +1245,12 @@ export default function SalesQuestPage() {
 
                   {loading && (
                     <div className="message assistant">
-                      <span>
-                        顧客
-                      </span>
+                      <div className="messageName">
+                        👤 顧客
+                      </div>
 
                       <p className="thinking">
-                        考えています…
+                        顧客が考えています…
                       </p>
                     </div>
                   )}
@@ -740,7 +1300,7 @@ export default function SalesQuestPage() {
                         e.target.value
                       )
                     }
-                    placeholder="自由に営業してみよう…"
+                    placeholder="コマンドを入力する…"
                     maxLength={5000}
                   />
 
@@ -753,21 +1313,20 @@ export default function SalesQuestPage() {
                         "in_progress"
                     }
                   >
-                    送信
+                    話す
                   </button>
                 </form>
 
                 <div className="finish">
                   <span>
-                    会話を終えたら、
-                    AI評価を受けましょう。
+                    会話を終えたら採点できます。
                   </span>
 
                   <button
                     onClick={finish}
                     disabled={loading}
                   >
-                    会話を終了して採点
+                    📜 クエスト終了・採点
                   </button>
                 </div>
               </div>
@@ -855,21 +1414,48 @@ export default function SalesQuestPage() {
 
         {result && (
           <section className="result">
+            <div className="resultBanner">
+              {result.status ===
+              "cleared"
+                ? "🏆 QUEST CLEAR"
+                : "📜 QUEST RESULT"}
+            </div>
+
             <p className="eyebrow">
-              {result.status === "cleared"
-                ? "QUEST CLEAR"
-                : "QUEST RESULT"}
+              ADVENTURE RESULT
             </p>
 
             <h2>
               {result.evaluation.total}
-              <small> / 100</small>
+              <small>/ 100</small>
             </h2>
 
             <p className="scoreCaption">
               営業スコア　+
               {result.expGained} EXP
             </p>
+
+            <div className="resultLevel">
+              <div>
+                <small>
+                  CURRENT LEVEL
+                </small>
+
+                <strong>
+                  Lv.{stats.level}
+                </strong>
+              </div>
+
+              <div>
+                <small>
+                  TITLE
+                </small>
+
+                <strong>
+                  {getTitle(stats.level)}
+                </strong>
+              </div>
+            </div>
 
             <div className="scoreGrid">
               {Object.entries(
@@ -902,7 +1488,9 @@ export default function SalesQuestPage() {
 
             <div className="feedback">
               <article>
-                <h3>GOOD</h3>
+                <h3>
+                  🟢 GOOD
+                </h3>
 
                 {result.evaluation.goodPoints.map(
                   (item, index) => (
@@ -914,7 +1502,9 @@ export default function SalesQuestPage() {
               </article>
 
               <article>
-                <h3>NEXT</h3>
+                <h3>
+                  🔴 NEXT
+                </h3>
 
                 {result.evaluation.improvements.map(
                   (item, index) => (
@@ -930,12 +1520,21 @@ export default function SalesQuestPage() {
               {result.evaluation.summary}
             </div>
 
-            <button
-              className="primary"
-              onClick={reset}
-            >
-              もう一度挑戦する
-            </button>
+            <div className="resultActions">
+              <button
+                className="secondaryButton"
+                onClick={reset}
+              >
+                📜 もう一度挑戦
+              </button>
+
+              <button
+                className="primary"
+                onClick={logout}
+              >
+                🏰 冒険者の城へ
+              </button>
+            </div>
           </section>
         )}
       </section>
@@ -943,13 +1542,13 @@ export default function SalesQuestPage() {
       <style jsx>{`
         .page {
           min-height: 100vh;
-          padding: 36px 18px;
+          padding: 26px 18px 60px;
           background:
             radial-gradient(
-              circle at top,
-              #24305b 0,
-              #0b1020 43%,
-              #090d18 100%
+              circle at 50% -10%,
+              #29376e 0,
+              #10172d 35%,
+              #080b15 75%
             );
         }
 
@@ -958,258 +1557,814 @@ export default function SalesQuestPage() {
           margin: auto;
         }
 
-        header {
+        .header {
           display: flex;
           align-items: center;
-          gap: 24px;
-          min-height: 70px;
-          margin-bottom: 38px;
+          gap: 18px;
+          min-height: 68px;
+          margin-bottom: 30px;
         }
 
         .back {
-          color: #a9b5dc;
+          color: #9ba8cc;
           text-decoration: none;
-          font-size: 13px;
+          font-size: 12px;
         }
 
         .brand {
           display: flex;
           align-items: center;
-          gap: 12px;
+          gap: 11px;
           margin-right: auto;
         }
 
-        .brand > span {
+        .brandIcon {
+          width: 44px;
+          height: 44px;
           display: grid;
           place-items: center;
-          width: 42px;
-          height: 42px;
-          border-radius: 12px;
+          border: 1px solid #6f5ba7;
+          border-radius: 10px;
           background:
             linear-gradient(
-              135deg,
-              #9c6cff,
-              #5a36d8
+              145deg,
+              #2e2555,
+              #151a35
             );
+          box-shadow:
+            0 8px 30px #0008;
           font-size: 20px;
         }
 
-        .brand small,
-        .eyebrow {
-          font-size: 10px;
-          letter-spacing: 1.5px;
-          color: #ac95ff;
-          font-weight: 800;
-          margin: 0;
+        .brand small {
+          display: block;
+          color: #a992ff;
+          font-size: 8px;
+          font-weight: 900;
+          letter-spacing: 1.7px;
         }
 
         .brand h1 {
-          font-size: 21px;
           margin: 2px 0 0;
+          font-size: 20px;
         }
 
-        .levelBox {
-          min-width: 155px;
-        }
-
-        .levelTitle {
+        .headerPlayer {
           display: flex;
           align-items: center;
-          justify-content: space-between;
-          gap: 12px;
-          font-weight: 800;
-          font-size: 13px;
+          gap: 9px;
+          padding: 7px 10px;
+          border: 1px solid #303b62;
+          border-radius: 10px;
+          background: #11182c;
         }
 
-        .levelTitle small {
-          color: #9ca8c9;
+        .headerAvatar {
+          width: 30px;
+          height: 30px;
+          display: grid;
+          place-items: center;
+          border-radius: 7px;
+          background: #6950bc;
+          font-weight: 900;
+        }
+
+        .headerPlayer strong,
+        .headerPlayer span {
+          display: block;
+        }
+
+        .headerPlayer strong {
+          font-size: 11px;
+        }
+
+        .headerPlayer span {
+          color: #8996b8;
           font-size: 9px;
-          font-weight: 600;
+          margin-top: 2px;
         }
 
-        .expText {
-          display: block;
-          color: #9ca8c9;
-          font-size: 10px;
-          margin-top: 5px;
-          text-align: right;
-        }
-
-        .bar {
-          height: 6px;
-          width: 155px;
-          background: #252e4a;
-          border-radius: 9px;
-          margin-top: 7px;
-          overflow: hidden;
-        }
-
-        .bar i {
-          height: 100%;
-          display: block;
-          background: #a578ff;
-          border-radius: 9px;
-          transition: width 0.4s ease;
-        }
-
-        .startCard,
-        .quest,
-        .result {
-          background: rgba(20, 27, 49, 0.9);
-          border: 1px solid #323d63;
-          border-radius: 20px;
-          box-shadow:
-            0 20px 70px rgba(0, 0, 0, 0.25);
-        }
-
-        .startCard {
-          text-align: center;
-          padding: 68px 40px;
-        }
-
-        .startCard h2,
-        .quest h2 {
-          font-size: 28px;
-          margin: 8px 0 12px;
-        }
-
-        .lead {
-          max-width: 590px;
-          color: #bdc6df;
-          font-size: 14px;
-          line-height: 1.8;
-          margin: 0 auto 26px;
-        }
-
-        .rules {
+        .error {
           display: flex;
-          justify-content: center;
-          gap: 10px;
-          flex-wrap: wrap;
+          align-items: center;
+          gap: 9px;
+          padding: 12px 15px;
+          border: 1px solid #843b55;
+          color: #ffc3d0;
+          background: #42202c;
+          border-radius: 10px;
+          margin-bottom: 18px;
+          font-size: 12px;
+        }
+
+        .eyebrow {
+          margin: 0;
+          color: #ad91ff;
+          font-size: 9px;
+          font-weight: 900;
+          letter-spacing: 1.7px;
+        }
+
+        /* LOGIN */
+
+        .loginScreen {
+          max-width: 650px;
+          margin: 0 auto;
+          text-align: center;
+        }
+
+        .castle {
+          position: relative;
+          height: 135px;
+          display: grid;
+          place-items: center;
+        }
+
+        .castleGlow {
+          position: absolute;
+          width: 180px;
+          height: 100px;
+          border-radius: 50%;
+          background: #8661ff22;
+          filter: blur(25px);
+        }
+
+        .castleEmoji {
+          position: relative;
+          font-size: 76px;
+          filter:
+            drop-shadow(
+              0 15px 30px #0008
+            );
+        }
+
+        .loginScreen h2 {
+          margin: 8px 0 14px;
+          font-size: 34px;
+          line-height: 1.25;
+        }
+
+        .loginLead {
+          color: #9faaca;
+          font-size: 12px;
+          line-height: 1.8;
           margin: 0 0 25px;
         }
 
-        .rules span {
-          font-size: 12px;
-          padding: 9px 12px;
-          background: #202a48;
-          border-radius: 8px;
-          color: #d6dcf0;
-        }
-
-        .startTip {
-          max-width: 560px;
-          margin: 0 auto 28px;
-          padding: 14px 17px;
+        .loginPanel {
           text-align: left;
-          background: #17152b;
-          border: 1px solid #514174;
-          border-radius: 12px;
+          padding: 18px;
+          border: 1px solid #394568;
+          border-radius: 16px;
+          background:
+            linear-gradient(
+              145deg,
+              #141c35ee,
+              #0e1426ee
+            );
+          box-shadow:
+            0 25px 80px #0006;
         }
 
-        .startTip > span,
-        .liveTip > span {
-          display: block;
-          color: #b997ff;
-          font-size: 9px;
-          font-weight: 900;
-          letter-spacing: 1.2px;
-          margin-bottom: 6px;
+        .loginPanelHeader {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          margin-bottom: 14px;
         }
 
-        .startTip strong {
+        .loginPanelHeader small,
+        .loginPanelHeader strong {
           display: block;
-          color: #eee8ff;
+        }
+
+        .loginPanelHeader small {
+          color: #8e9abd;
+          font-size: 8px;
+          letter-spacing: 1.4px;
+        }
+
+        .loginPanelHeader strong {
+          font-size: 15px;
+          margin-top: 3px;
+        }
+
+        .loginPanelHeader > span {
+          color: #8996b8;
+          font-size: 10px;
+        }
+
+        .searchBox {
+          display: flex;
+          align-items: center;
+          gap: 9px;
+          padding: 11px 13px;
+          border: 1px solid #364263;
+          border-radius: 9px;
+          background: #090f20;
+          margin-bottom: 10px;
+        }
+
+        .searchBox input {
+          flex: 1;
+          min-width: 0;
+          outline: none;
+          border: 0;
+          background: transparent;
+          color: white;
           font-size: 12px;
         }
 
-        .startTip p {
-          color: #aeb6ce;
-          font-size: 11px;
-          line-height: 1.55;
-          margin: 5px 0 0;
+        .employeeList {
+          max-height: 390px;
+          overflow: auto;
         }
 
-        .primary,
-        .send {
+        .employeeRow {
+          width: 100%;
+          display: flex;
+          align-items: center;
+          gap: 11px;
+          padding: 10px;
+          margin-top: 5px;
+          text-align: left;
+          border: 1px solid transparent;
+          border-radius: 9px;
+          background: #151d35;
+          color: white;
+          cursor: pointer;
+          transition:
+            transform 0.15s ease,
+            border-color 0.15s ease,
+            background 0.15s ease;
+        }
+
+        .employeeRow:hover {
+          transform: translateX(3px);
+          border-color: #6d5a9e;
+          background: #1d2745;
+        }
+
+        .employeeAvatar {
+          width: 34px;
+          height: 34px;
+          flex-shrink: 0;
+          display: grid;
+          place-items: center;
+          border-radius: 8px;
           background:
             linear-gradient(
               135deg,
-              #9b6bff,
-              #7046eb
+              #7658d0,
+              #43318b
             );
-          color: white;
-          font-weight: 800;
-          border-radius: 10px;
-          padding: 13px 24px;
-          cursor: pointer;
-          box-shadow:
-            0 8px 20px #6f45eb33;
+          font-weight: 900;
+          font-size: 12px;
         }
 
-        .primary:disabled,
-        .send:disabled {
+        .employeeInfo {
+          flex: 1;
+          min-width: 0;
+        }
+
+        .employeeInfo strong,
+        .employeeInfo span {
+          display: block;
+        }
+
+        .employeeInfo strong {
+          font-size: 12px;
+        }
+
+        .employeeInfo span {
+          color: #7886aa;
+          font-size: 9px;
+          margin-top: 3px;
+        }
+
+        .arrow {
+          color: #8e79d4;
+          font-size: 17px;
+        }
+
+        .empty {
+          padding: 45px 20px;
+          text-align: center;
+          color: #7785a9;
+        }
+
+        .empty span {
+          font-size: 28px;
+        }
+
+        .empty p {
+          font-size: 11px;
+        }
+
+        .loadingOrb {
+          animation: pulse 1s infinite;
+        }
+
+        @keyframes pulse {
+          50% {
+            opacity: 0.35;
+            transform: scale(0.85);
+          }
+        }
+
+        /* BOARD */
+
+        .boardPage {
+          animation: fadeIn 0.35s ease;
+        }
+
+        @keyframes fadeIn {
+          from {
+            opacity: 0;
+            transform: translateY(8px);
+          }
+
+          to {
+            opacity: 1;
+            transform: translateY(0);
+          }
+        }
+
+        .heroTop {
+          display: flex;
+          align-items: flex-start;
+          justify-content: space-between;
+          margin-bottom: 22px;
+        }
+
+        .heroTop h2 {
+          margin: 5px 0 7px;
+          font-size: 29px;
+        }
+
+        .heroLead {
+          margin: 0;
+          color: #929fbe;
+          font-size: 12px;
+          line-height: 1.7;
+        }
+
+        .logoutButton {
+          color: #8996b8;
+          background: #11182b;
+          border: 1px solid #303b5d;
+          padding: 9px 12px;
+          border-radius: 8px;
+          cursor: pointer;
+          font-size: 10px;
+        }
+
+        .adventurerCard {
+          display: flex;
+          align-items: center;
+          gap: 16px;
+          padding: 18px;
+          margin-bottom: 15px;
+          border: 1px solid #4a416f;
+          border-radius: 15px;
+          background:
+            linear-gradient(
+              110deg,
+              #1c1938,
+              #11172d
+            );
+          box-shadow:
+            0 15px 50px #0005;
+        }
+
+        .avatar {
+          width: 62px;
+          height: 62px;
+          flex-shrink: 0;
+          display: grid;
+          place-items: center;
+          border-radius: 12px;
+          border: 2px solid #7c65c4;
+          background:
+            linear-gradient(
+              145deg,
+              #7455ca,
+              #342563
+            );
+          font-size: 25px;
+          font-weight: 900;
+        }
+
+        .adventurerMain {
+          flex: 1;
+        }
+
+        .adventurerName {
+          font-size: 17px;
+          font-weight: 900;
+        }
+
+        .title {
+          color: #a992f4;
+          font-size: 10px;
+          margin-top: 3px;
+        }
+
+        .expRow {
+          display: flex;
+          justify-content: space-between;
+          margin-top: 12px;
+          color: #858fb0;
+          font-size: 8px;
+          font-weight: 800;
+          letter-spacing: 0.7px;
+        }
+
+        .expBar {
+          height: 8px;
+          margin-top: 6px;
+          background: #292d4a;
+          border-radius: 8px;
+          overflow: hidden;
+        }
+
+        .expBar i {
+          display: block;
+          height: 100%;
+          background:
+            linear-gradient(
+              90deg,
+              #6f4bd0,
+              #b58aff
+            );
+          border-radius: 8px;
+          transition: width 0.5s ease;
+        }
+
+        .levelBadge {
+          min-width: 76px;
+          text-align: center;
+          padding-left: 15px;
+          border-left: 1px solid #343c5c;
+        }
+
+        .levelBadge small,
+        .levelBadge strong,
+        .levelBadge span {
+          display: block;
+        }
+
+        .levelBadge small {
+          color: #7885a7;
+          font-size: 8px;
+        }
+
+        .levelBadge strong {
+          color: #cdbaff;
+          font-size: 28px;
+          line-height: 1.05;
+        }
+
+        .levelBadge span {
+          color: #7885a7;
+          font-size: 8px;
+        }
+
+        .boardGrid {
+          display: grid;
+          grid-template-columns: minmax(0, 1fr) 300px;
+          gap: 15px;
+        }
+
+        .questBoard,
+        .guildCard,
+        .tipCard,
+        .difficultyCard {
+          border: 1px solid #303b5d;
+          border-radius: 14px;
+          background: #11182d;
+        }
+
+        .questBoard {
+          padding: 20px;
+        }
+
+        .sectionTitle {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          margin-bottom: 16px;
+        }
+
+        .sectionTitle > div {
+          display: flex;
+          align-items: center;
+          gap: 9px;
+        }
+
+        .sectionIcon {
+          font-size: 20px;
+        }
+
+        .sectionTitle small {
+          display: block;
+          color: #7e8bae;
+          font-size: 8px;
+          letter-spacing: 1.4px;
+        }
+
+        .sectionTitle h3 {
+          margin: 2px 0 0;
+          font-size: 15px;
+        }
+
+        .available {
+          color: #70e5ad;
+          font-size: 8px;
+          font-weight: 900;
+          letter-spacing: 1px;
+        }
+
+        .questCard {
+          display: flex;
+          gap: 17px;
+          padding: 18px;
+          border: 1px solid #594b85;
+          border-radius: 12px;
+          background:
+            linear-gradient(
+              135deg,
+              #201b3d,
+              #131a30
+            );
+          box-shadow:
+            inset 0 0 30px #8b6cff08;
+        }
+
+        .questIcon {
+          width: 58px;
+          height: 58px;
+          flex-shrink: 0;
+          display: grid;
+          place-items: center;
+          border: 1px solid #725cae;
+          border-radius: 11px;
+          background: #17152d;
+          font-size: 27px;
+        }
+
+        .questContent {
+          flex: 1;
+        }
+
+        .questMeta {
+          display: flex;
+          gap: 7px;
+          flex-wrap: wrap;
+        }
+
+        .questMeta span {
+          padding: 4px 7px;
+          border-radius: 5px;
+          background: #292345;
+          color: #b29af0;
+          font-size: 8px;
+          font-weight: 900;
+        }
+
+        .questContent h3 {
+          margin: 9px 0 7px;
+          font-size: 18px;
+        }
+
+        .questContent > p {
+          margin: 0;
+          color: #919dbc;
+          font-size: 11px;
+          line-height: 1.7;
+        }
+
+        .questObjective {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          margin: 14px 0;
+          padding: 10px;
+          border-radius: 8px;
+          background: #0c1223;
+        }
+
+        .questObjective span {
+          color: #a78df0;
+          font-size: 9px;
+          font-weight: 900;
+        }
+
+        .questObjective strong {
+          color: #d3d9eb;
+          font-size: 10px;
+        }
+
+        .questStart,
+        .primary {
+          color: white;
+          font-weight: 900;
+          border-radius: 8px;
+          padding: 11px 17px;
+          cursor: pointer;
+          background:
+            linear-gradient(
+              135deg,
+              #8060df,
+              #5737bd
+            );
+          box-shadow:
+            0 8px 25px #6d4de633;
+        }
+
+        .questStart:disabled,
+        .primary:disabled {
           opacity: 0.5;
           cursor: not-allowed;
         }
 
-        .miniStats {
+        .lockedQuest {
           display: flex;
-          justify-content: center;
-          gap: 1px;
-          margin: 44px auto 0;
-          max-width: 360px;
-          border-top: 1px solid #303a5c;
-          padding-top: 22px;
+          align-items: center;
+          gap: 11px;
+          margin-top: 9px;
+          padding: 12px 14px;
+          border: 1px solid #242e49;
+          border-radius: 9px;
+          background: #0e1425;
+          color: #596681;
         }
 
-        .miniStats div {
-          width: 50%;
+        .lockedQuest > span {
+          font-size: 16px;
         }
 
-        .miniStats b {
+        .lockedQuest strong,
+        .lockedQuest small {
           display: block;
-          font-size: 24px;
         }
 
-        .miniStats small,
-        .scoreCaption {
-          display: block;
-          color: #9ca8c9;
-          font-size: 11px;
-          margin-top: 5px;
+        .lockedQuest strong {
+          font-size: 10px;
         }
+
+        .lockedQuest small {
+          font-size: 8px;
+          margin-top: 3px;
+        }
+
+        .guildSide {
+          display: flex;
+          flex-direction: column;
+          gap: 15px;
+        }
+
+        .guildCard,
+        .tipCard,
+        .difficultyCard {
+          padding: 17px;
+        }
+
+        .compact {
+          margin-bottom: 15px;
+        }
+
+        .guildStats {
+          display: grid;
+          grid-template-columns: 1fr 1fr;
+          gap: 7px;
+        }
+
+        .guildStats div {
+          padding: 11px;
+          border-radius: 8px;
+          background: #171f36;
+        }
+
+        .guildStats div:last-child {
+          grid-column: 1 / -1;
+        }
+
+        .guildStats span,
+        .guildStats strong {
+          display: block;
+        }
+
+        .guildStats span {
+          color: #7785a6;
+          font-size: 8px;
+        }
+
+        .guildStats strong {
+          margin-top: 4px;
+          color: #cbb8ff;
+          font-size: 20px;
+        }
+
+        .tipCard {
+          border-color: #514174;
+          background: #17152b;
+        }
+
+        .tipCard > span,
+        .difficultyCard > span {
+          display: block;
+          color: #a88ff0;
+          font-size: 8px;
+          font-weight: 900;
+          letter-spacing: 1.1px;
+        }
+
+        .tipCard strong {
+          display: block;
+          margin-top: 9px;
+          font-size: 12px;
+        }
+
+        .tipCard p,
+        .difficultyCard p {
+          margin: 6px 0 0;
+          color: #919cba;
+          font-size: 10px;
+          line-height: 1.55;
+        }
+
+        .difficultyCard strong {
+          display: block;
+          margin-top: 8px;
+          color: #d7dded;
+          font-size: 14px;
+        }
+
+        /* BATTLE */
 
         .quest {
           overflow: hidden;
+          border: 1px solid #35405f;
+          border-radius: 16px;
+          background: #11182c;
+          box-shadow:
+            0 25px 80px #0005;
+          animation: fadeIn 0.3s ease;
         }
 
         .questHead {
           display: flex;
+          align-items: center;
           justify-content: space-between;
-          padding: 24px 28px;
+          padding: 19px 22px;
           border-bottom: 1px solid #303a5c;
         }
 
-        .questHead h2 {
-          font-size: 20px;
-          margin: 5px 0;
+        .questBreadcrumb {
+          display: flex;
+          gap: 7px;
+          align-items: center;
+          color: #a78bf0;
+          font-size: 8px;
+          font-weight: 900;
+          letter-spacing: 1px;
         }
 
-        .questHead p:not(.eyebrow) {
-          font-size: 12px;
-          color: #aab5d1;
+        .questHead h2 {
+          margin: 7px 0 3px;
+          font-size: 19px;
+        }
+
+        .questHead p {
           margin: 0;
+          color: #8995b5;
+          font-size: 10px;
+        }
+
+        .battleStatus {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+        }
+
+        .difficultyMini {
+          color: #d2c6f4;
+          padding: 6px 8px;
+          border: 1px solid #3b4163;
+          border-radius: 6px;
+          background: #191f36;
+          font-size: 8px;
+          font-weight: 800;
         }
 
         .status {
-          height: max-content;
-          padding: 8px 11px;
-          border-radius: 20px;
-          background: #243052;
-          color: #bfcaf1;
-          font-size: 11px;
-          font-weight: 800;
+          padding: 7px 10px;
+          border-radius: 6px;
+          background: #233052;
+          color: #bdc8e9;
+          font-size: 8px;
+          font-weight: 900;
         }
 
         .status.cleared {
@@ -1220,6 +2375,32 @@ export default function SalesQuestPage() {
         .status.failed {
           background: #532a38;
           color: #ffc0cf;
+        }
+
+        .battleMission {
+          display: flex;
+          align-items: center;
+          gap: 10px;
+          padding: 9px 22px;
+          background: #0c1222;
+          border-bottom: 1px solid #272f4a;
+        }
+
+        .battleMission span {
+          color: #a68bf0;
+          font-size: 8px;
+          font-weight: 900;
+        }
+
+        .battleMission strong {
+          color: #d7dcef;
+          font-size: 9px;
+        }
+
+        .battleMission small {
+          margin-left: auto;
+          color: #687697;
+          font-size: 8px;
         }
 
         .battleLayout {
@@ -1234,293 +2415,307 @@ export default function SalesQuestPage() {
         }
 
         .chat {
-          min-height: 370px;
-          max-height: 52vh;
+          min-height: 365px;
+          max-height: 50vh;
           overflow: auto;
-          padding: 25px;
+          padding: 22px;
         }
 
         .message {
           max-width: 78%;
-          margin-bottom: 18px;
+          margin-bottom: 17px;
         }
 
         .message.user {
           margin-left: auto;
         }
 
-        .message span {
-          font-size: 10px;
-          font-weight: 800;
-          color: #acb7d5;
+        .messageName {
+          color: #8996b7;
+          font-size: 9px;
+          font-weight: 900;
+          margin-bottom: 5px;
         }
 
         .message p {
-          background: #222b48;
-          border-radius: 4px 13px 13px 13px;
-          padding: 12px 14px;
-          margin: 5px 0 0;
-          line-height: 1.65;
-          font-size: 13px;
+          margin: 0;
+          padding: 11px 13px;
+          border: 1px solid #2e3857;
+          border-radius: 4px 12px 12px 12px;
+          background: #1b2440;
+          color: #dbe1f0;
+          line-height: 1.7;
+          font-size: 12px;
           white-space: pre-wrap;
         }
 
         .message.user p {
-          background: #7850e8;
-          border-radius: 13px 4px 13px 13px;
+          border-color: #6d51c0;
+          border-radius: 12px 4px 12px 12px;
+          background: #6242ba;
+          color: white;
         }
 
         .thinking {
-          color: #aab5d1;
+          color: #8793b1 !important;
           font-style: italic;
         }
 
         .psychology {
-          margin: 0 22px 12px;
-          padding: 12px 14px;
+          margin: 0 20px 10px;
+          padding: 11px 13px;
           border: 1px solid #514174;
+          border-radius: 8px;
           background: #17152b;
-          border-radius: 10px;
         }
 
         .psychology span {
           color: #b997ff;
-          font-size: 9px;
+          font-size: 8px;
           font-weight: 900;
-          letter-spacing: 1.2px;
+          letter-spacing: 1px;
         }
 
         .psychology p {
+          margin: 4px 0 0;
           color: #cfc5ed;
-          font-size: 11px;
-          margin: 5px 0 0;
+          font-size: 10px;
           line-height: 1.5;
         }
 
         .liveTip {
           display: flex;
           gap: 10px;
-          align-items: flex-start;
-          margin: 0 22px 14px;
-          padding: 10px 13px;
-          background: #131a2d;
+          margin: 0 20px 12px;
+          padding: 10px 12px;
           border: 1px solid #2d3858;
-          border-radius: 9px;
+          border-radius: 8px;
+          background: #0e1527;
         }
 
         .liveTip > span {
-          flex-shrink: 0;
-          margin: 2px 0 0;
+          color: #a88ff0;
+          font-size: 8px;
+          font-weight: 900;
         }
 
         .liveTip strong {
-          color: #dcd5ef;
-          font-size: 10px;
+          color: #d7ddef;
+          font-size: 9px;
         }
 
         .liveTip p {
-          color: #8995b5;
-          font-size: 10px;
-          line-height: 1.45;
           margin: 3px 0 0;
+          color: #7e8ba9;
+          font-size: 9px;
+          line-height: 1.45;
         }
 
         .composer {
           display: flex;
-          gap: 10px;
-          padding: 18px 22px;
+          gap: 8px;
+          padding: 15px 20px;
           border-top: 1px solid #303a5c;
         }
 
         .composer input {
           min-width: 0;
           flex: 1;
-          color: white;
-          background: #11172a;
-          border: 1px solid #374365;
-          border-radius: 10px;
-          padding: 12px 13px;
+          padding: 11px 12px;
+          border: 1px solid #34405f;
+          border-radius: 8px;
           outline: none;
-        }
-
-        .send {
-          padding: 11px 18px;
-        }
-
-        .finish {
-          border-top: 1px solid #303a5c;
-          padding: 14px 22px;
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
-          color: #99a7c8;
+          background: #0a1020;
+          color: white;
           font-size: 11px;
         }
 
-        .finish button {
+        .send {
+          padding: 10px 18px;
+          border-radius: 8px;
+          background: #6949c8;
+          color: white;
+          font-weight: 800;
           cursor: pointer;
-          color: #c9b9ff;
+        }
+
+        .send:disabled {
+          opacity: 0.45;
+          cursor: not-allowed;
+        }
+
+        .finish {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          padding: 12px 20px;
+          border-top: 1px solid #303a5c;
+          color: #6f7c9e;
+          font-size: 9px;
+        }
+
+        .finish button {
+          color: #ad95f0;
           background: transparent;
-          font-weight: 700;
+          font-size: 9px;
+          font-weight: 800;
+          cursor: pointer;
         }
 
         .sidePanel {
-          background: rgba(10, 15, 30, 0.42);
+          background: #0d1427;
         }
 
         .customerInfo {
-          padding: 20px;
+          padding: 18px;
           border-bottom: 1px solid #303a5c;
         }
 
         .customerInfoHeader,
         .stateHeader {
           display: flex;
-          justify-content: space-between;
           align-items: flex-start;
+          justify-content: space-between;
         }
 
         .customerInfoHeader {
-          margin-bottom: 15px;
+          margin-bottom: 13px;
         }
 
         .customerInfoHeader h3,
         .stateHeader h3 {
           margin: 4px 0 0;
-          font-size: 16px;
+          font-size: 14px;
         }
 
         .researchBadge {
-          font-size: 8px;
-          font-weight: 900;
-          color: #9cb2ef;
+          padding: 4px 6px;
           border: 1px solid #35436a;
+          border-radius: 5px;
           background: #18213b;
-          border-radius: 6px;
-          padding: 5px 6px;
+          color: #9cb2ef;
+          font-size: 7px;
+          font-weight: 900;
         }
 
         .infoGrid {
           display: grid;
           grid-template-columns: 1fr 1fr;
-          gap: 7px;
+          gap: 6px;
         }
 
         .infoItem {
-          padding: 9px 10px;
-          background: #151d34;
+          padding: 8px 9px;
           border: 1px solid #252f4b;
-          border-radius: 8px;
+          border-radius: 7px;
+          background: #131c32;
+        }
+
+        .infoItem span,
+        .infoItem strong {
+          display: block;
         }
 
         .infoItem span {
-          display: block;
-          color: #7785aa;
-          font-size: 8px;
-          margin-bottom: 3px;
+          color: #6f7d9f;
+          font-size: 7px;
         }
 
         .infoItem strong {
-          display: block;
-          color: #dbe2f3;
-          font-size: 10px;
-          line-height: 1.35;
+          margin-top: 3px;
+          color: #d2d9ea;
+          font-size: 9px;
+          line-height: 1.3;
         }
 
         .customerNotes {
-          margin-top: 10px;
-          padding-top: 10px;
+          margin-top: 9px;
+          padding-top: 9px;
           border-top: 1px solid #252f4b;
         }
 
         .customerNotes > p {
-          color: #8e9abc;
-          font-size: 9px;
-          margin: 0 0 7px;
+          margin: 0 0 5px;
+          color: #7e8bab;
+          font-size: 8px;
         }
 
         .customerNotes > div {
           display: flex;
-          gap: 7px;
-          margin-top: 5px;
+          gap: 6px;
+          margin-top: 4px;
         }
 
         .customerNotes span {
-          flex-shrink: 0;
-          color: #7180a4;
-          font-size: 8px;
+          color: #687697;
+          font-size: 7px;
         }
 
         .customerNotes b {
-          color: #bfc8dc;
-          font-size: 9px;
+          color: #b8c2d9;
+          font-size: 8px;
           font-weight: 600;
-          line-height: 1.4;
         }
 
         .statePanel {
-          padding: 20px;
-        }
-
-        .stateHeader {
-          margin-bottom: 18px;
+          padding: 18px;
         }
 
         .live {
-          font-size: 9px;
-          color: #7cf0bb;
-          font-weight: 900;
-          letter-spacing: 1px;
-          padding: 5px 7px;
+          padding: 4px 6px;
           border: 1px solid #285c49;
-          border-radius: 6px;
+          border-radius: 5px;
           background: #10251f;
+          color: #7cf0bb;
+          font-size: 7px;
+          font-weight: 900;
         }
 
         .stateList {
           display: flex;
           flex-direction: column;
-          gap: 14px;
+          gap: 12px;
+          margin-top: 16px;
         }
 
         .stateItem {
-          padding-bottom: 11px;
-          border-bottom: 1px solid #252f4b;
+          padding-bottom: 9px;
+          border-bottom: 1px solid #242e49;
         }
 
         .stateTop {
           display: flex;
           justify-content: space-between;
           align-items: center;
-          margin-bottom: 7px;
+          margin-bottom: 6px;
         }
 
         .stateName {
-          font-size: 11px;
+          color: #cbd3e6;
+          font-size: 9px;
           font-weight: 800;
-          color: #d7dded;
         }
 
         .stateIcon {
-          margin-right: 5px;
+          margin-right: 4px;
         }
 
         .stateTop strong {
-          font-size: 14px;
-          color: #cbb8ff;
+          color: #c6b2ff;
+          font-size: 12px;
         }
 
         .stateBar {
-          height: 7px;
-          background: #242e49;
-          border-radius: 10px;
+          height: 6px;
           overflow: hidden;
+          border-radius: 8px;
+          background: #242e49;
         }
 
         .stateBar i {
           display: block;
           height: 100%;
-          border-radius: 10px;
+          border-radius: 8px;
           background:
             linear-gradient(
               90deg,
@@ -1532,10 +2727,9 @@ export default function SalesQuestPage() {
 
         .stateItem small {
           display: block;
-          margin-top: 5px;
-          color: #7785aa;
-          font-size: 8px;
-          line-height: 1.4;
+          margin-top: 4px;
+          color: #687697;
+          font-size: 7px;
         }
 
         .stateItem.danger .stateTop strong {
@@ -1552,129 +2746,224 @@ export default function SalesQuestPage() {
         }
 
         .stateLegend {
-          margin-top: 18px;
-          padding-top: 13px;
-          border-top: 1px solid #303a5c;
           display: flex;
           flex-direction: column;
-          gap: 5px;
+          gap: 4px;
+          margin-top: 14px;
+          padding-top: 10px;
+          border-top: 1px solid #303a5c;
         }
 
         .stateLegend span {
-          font-size: 8px;
-          color: #7683a5;
+          color: #687697;
+          font-size: 7px;
         }
 
+        /* RESULT */
+
         .result {
+          padding: 38px;
+          border: 1px solid #3d4770;
+          border-radius: 16px;
+          background:
+            linear-gradient(
+              145deg,
+              #151d38,
+              #0e1427
+            );
           text-align: center;
-          padding: 40px;
+          box-shadow:
+            0 25px 80px #0006;
+          animation: fadeIn 0.3s ease;
+        }
+
+        .resultBanner {
+          display: inline-block;
+          padding: 7px 11px;
+          margin-bottom: 12px;
+          border: 1px solid #665394;
+          border-radius: 7px;
+          background: #211b3d;
+          color: #c6b1ff;
+          font-size: 9px;
+          font-weight: 900;
+          letter-spacing: 1.3px;
         }
 
         .result h2 {
-          font-size: 68px;
+          margin: 7px 0 0;
+          color: #d1bfff;
+          font-size: 72px;
           line-height: 1;
-          margin: 8px 0 0;
-          color: #cfb8ff;
         }
 
         .result h2 small {
-          font-size: 21px;
-          color: #8995b8;
+          color: #7985a5;
+          font-size: 20px;
         }
 
         .scoreCaption {
-          margin-bottom: 32px;
+          color: #8c98b7;
+          font-size: 10px;
+          margin: 8px 0 22px;
+        }
+
+        .resultLevel {
+          display: flex;
+          justify-content: center;
+          gap: 1px;
+          margin: 0 auto 25px;
+        }
+
+        .resultLevel div {
+          min-width: 150px;
+          padding: 12px;
+          background: #151d34;
+        }
+
+        .resultLevel div:first-child {
+          border-radius: 8px 0 0 8px;
+        }
+
+        .resultLevel div:last-child {
+          border-radius: 0 8px 8px 0;
+        }
+
+        .resultLevel small,
+        .resultLevel strong {
+          display: block;
+        }
+
+        .resultLevel small {
+          color: #7180a2;
+          font-size: 7px;
+        }
+
+        .resultLevel strong {
+          color: #d1c3f2;
+          font-size: 12px;
+          margin-top: 4px;
         }
 
         .scoreGrid {
           display: grid;
           grid-template-columns: repeat(5, 1fr);
-          gap: 10px;
+          gap: 8px;
           text-align: left;
-          margin-bottom: 28px;
+          margin-bottom: 20px;
         }
 
         .scoreGrid > div {
-          padding: 13px;
-          background: #171f37;
-          border-radius: 11px;
+          padding: 12px;
+          border: 1px solid #293451;
+          border-radius: 9px;
+          background: #151d34;
+        }
+
+        .scoreGrid span,
+        .scoreGrid b {
+          display: block;
         }
 
         .scoreGrid span {
-          font-size: 10px;
-          color: #aeb8d2;
-          display: block;
+          color: #9ca8c6;
+          font-size: 8px;
         }
 
         .scoreGrid b {
-          font-size: 21px;
-          display: block;
-          margin: 7px 0;
+          margin: 6px 0;
+          font-size: 18px;
         }
 
         .scoreGrid b small {
-          font-size: 10px;
-          color: #8e9ab9;
+          color: #7784a5;
+          font-size: 8px;
         }
 
         .scoreGrid i {
           display: block;
           height: 4px;
+          overflow: hidden;
           border-radius: 4px;
           background: #2d3858;
-          overflow: hidden;
         }
 
         .scoreGrid em {
           display: block;
           height: 100%;
+          border-radius: 4px;
           background: #a578ff;
         }
 
         .feedback {
           display: grid;
           grid-template-columns: 1fr 1fr;
-          gap: 12px;
+          gap: 10px;
           text-align: left;
         }
 
         .feedback article {
-          padding: 18px;
-          background: #171f37;
-          border-radius: 11px;
+          padding: 16px;
+          border: 1px solid #293451;
+          border-radius: 9px;
+          background: #151d34;
         }
 
         .feedback h3 {
+          margin: 0 0 9px;
           color: #ad8aff;
-          margin: 0 0 10px;
-          font-size: 11px;
+          font-size: 9px;
           letter-spacing: 1px;
         }
 
-        .feedback p,
-        .summary {
-          font-size: 12px;
-          color: #c4cde1;
-          line-height: 1.65;
+        .feedback p {
           margin: 5px 0;
+          color: #bdc6da;
+          font-size: 10px;
+          line-height: 1.6;
         }
 
         .summary {
           max-width: 650px;
-          margin: 24px auto;
+          margin: 20px auto;
+          color: #c0c9dc;
+          font-size: 11px;
+          line-height: 1.7;
         }
 
-        .error {
-          padding: 12px 15px;
-          border: 1px solid #843b55;
-          color: #ffc3d0;
-          background: #42202c;
-          border-radius: 10px;
-          margin-bottom: 18px;
-          font-size: 13px;
+        .resultActions {
+          display: flex;
+          justify-content: center;
+          gap: 8px;
         }
+
+        .secondaryButton {
+          padding: 11px 16px;
+          border: 1px solid #424e71;
+          border-radius: 8px;
+          background: #161e35;
+          color: #c0c9dc;
+          cursor: pointer;
+          font-size: 10px;
+          font-weight: 800;
+        }
+
+        /* RESPONSIVE */
 
         @media (max-width: 900px) {
+          .boardGrid {
+            grid-template-columns: 1fr;
+          }
+
+          .guildSide {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+          }
+
+          .guildSide .difficultyCard {
+            grid-column: 1 / -1;
+          }
+
           .battleLayout {
             grid-template-columns: 1fr;
           }
@@ -1690,22 +2979,81 @@ export default function SalesQuestPage() {
           }
 
           .customerInfo {
-            border-bottom: 0;
             border-right: 1px solid #303a5c;
+            border-bottom: 0;
+          }
+
+          .statePanel {
+            min-width: 0;
+          }
+
+          .stateList {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+          }
+
+          .scoreGrid {
+            grid-template-columns: repeat(2, 1fr);
           }
         }
 
-        @media (max-width: 850px) {
-          header {
-            gap: 15px;
+        @media (max-width: 650px) {
+          .page {
+            padding: 18px 10px 40px;
           }
 
-          .levelBox {
-            min-width: 140px;
+          .header {
+            flex-wrap: wrap;
           }
 
-          .bar {
-            width: 140px;
+          .back {
+            order: 3;
+            width: 100%;
+          }
+
+          .headerPlayer {
+            margin-left: auto;
+          }
+
+          .loginScreen h2 {
+            font-size: 28px;
+          }
+
+          .adventurerCard {
+            align-items: flex-start;
+          }
+
+          .levelBadge {
+            display: none;
+          }
+
+          .questCard {
+            flex-direction: column;
+          }
+
+          .questIcon {
+            width: 48px;
+            height: 48px;
+          }
+
+          .guildSide {
+            display: flex;
+          }
+
+          .questHead {
+            align-items: flex-start;
+            gap: 10px;
+          }
+
+          .battleMission {
+            align-items: flex-start;
+            flex-wrap: wrap;
+          }
+
+          .battleMission small {
+            width: 100%;
+            margin-left: 0;
           }
 
           .sidePanel {
@@ -1719,53 +3067,15 @@ export default function SalesQuestPage() {
 
           .stateList {
             display: grid;
-            grid-template-columns: repeat(2, 1fr);
-            gap: 12px;
-          }
-        }
-
-        @media (max-width: 650px) {
-          .page {
-            padding: 20px 12px;
+            grid-template-columns: 1fr 1fr;
           }
 
-          header {
-            flex-wrap: wrap;
-            margin-bottom: 24px;
-          }
-
-          .back {
-            order: 3;
-            width: 100%;
-          }
-
-          .levelBox {
-            margin-left: auto;
-          }
-
-          .startCard,
-          .result {
-            padding: 36px 20px;
-          }
-
-          .startCard h2 {
-            font-size: 23px;
-          }
-
-          .scoreGrid {
-            grid-template-columns: repeat(2, 1fr);
-          }
-
-          .questHead {
-            padding: 18px;
+          .message {
+            max-width: 92%;
           }
 
           .composer {
-            padding: 13px;
-          }
-
-          .finish {
-            gap: 13px;
+            padding: 12px;
           }
 
           .finish span {
@@ -1776,16 +3086,25 @@ export default function SalesQuestPage() {
             grid-template-columns: 1fr;
           }
 
-          .message {
-            max-width: 90%;
+          .result {
+            padding: 28px 15px;
           }
 
-          .stateList {
-            grid-template-columns: 1fr;
+          .result h2 {
+            font-size: 58px;
           }
 
-          .infoGrid {
-            grid-template-columns: 1fr 1fr;
+          .resultLevel div {
+            min-width: 0;
+            width: 50%;
+          }
+
+          .resultActions {
+            flex-direction: column;
+          }
+
+          .resultActions button {
+            width: 100%;
           }
         }
       `}</style>
