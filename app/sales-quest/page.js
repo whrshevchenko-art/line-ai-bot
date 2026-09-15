@@ -632,15 +632,47 @@ export default function SalesQuestPage() {
   }, [messages, loading]);
 
   async function loadEmployees() {
-    setEmployeeLoading(true);
+  setEmployeeLoading(true);
 
-    try {
-      const response = await fetch(
-        "/api/employees",
-        {
-          method: "GET",
-          cache: "no-store",
-        }
+  try {
+    const response = await fetch("/api/employees", {
+      method: "GET",
+      cache: "no-store",
+    });
+
+    if (!response.ok) {
+      throw new Error("社員情報の取得に失敗しました。");
+    }
+
+    const data = await response.json();
+
+    console.log("EMPLOYEE API DATA:", data);
+
+    const employeeList = Array.isArray(data)
+      ? data
+      : Array.isArray(data?.employees)
+        ? data.employees
+        : [];
+
+    console.log("EMPLOYEE LIST:", employeeList);
+
+    const activeEmployees = employeeList.filter(
+      (item) =>
+        item &&
+        item.active !== false &&
+        item.quest_enabled !== false
+    );
+
+    console.log("冒険者データ:", activeEmployees);
+
+    setEmployees(activeEmployees);
+  } catch (e) {
+    console.error("冒険者取得エラー:", e);
+    setEmployees([]);
+    setError(e.message);
+  } finally {
+    setEmployeeLoading(false);
+  }
       );
 
 const data = await response.json();
