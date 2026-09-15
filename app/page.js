@@ -311,6 +311,17 @@ export default function Home() {
               <span style={styles.menuIcon}>✦</span>
               AI設定
             </button>
+  <a
+  href="/sales-quest"
+  style={{
+    ...styles.menuButton,
+    textDecoration: "none",
+    boxSizing: "border-box",
+  }}
+>
+  <span style={styles.menuIcon}>⚔</span>
+  営業クエスト
+</a>
           </div>
 
           <div style={styles.sidebarBottom}>
