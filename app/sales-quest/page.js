@@ -23,9 +23,6 @@ export default function SalesQuestPage() {
   const endRef = useRef(null);
 
   useEffect(() => setUserId(getUserId()), []);
-  useEffect(() => {
-    endRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages, loading]);
   
   async function request(url, body) {
     const response = await fetch(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
