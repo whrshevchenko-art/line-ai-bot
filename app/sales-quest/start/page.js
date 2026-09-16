@@ -32,8 +32,8 @@ export default function SalesQuestStartPage() {
       return;
     }
 
-    router.push("/sales-quest");
-  }
+  router.push("/sales-quest/play");
+}
 
   function handleBack() {
     router.push("/sales-quest");
