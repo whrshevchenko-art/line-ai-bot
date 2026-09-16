@@ -26,13 +26,13 @@ export default function SalesQuestStartPage() {
     }
   }, []);
 
-  function handleStart() {
-    if (!employee?.id) {
-      router.push("/sales-quest");
-      return;
-    }
+function handleStart() {
+  if (!employee?.id) {
+    router.push("/sales-quest");
+    return;
+  }
 
-  router.push("/sales-quest/play");
+  router.push("/sales-quest?autostart=1");
 }
 
   function handleBack() {
