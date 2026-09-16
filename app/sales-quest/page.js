@@ -626,6 +626,14 @@ export default function SalesQuestPage() {
   }, []);
 
   useEffect(() => {
+  const params = new URLSearchParams(window.location.search);
+
+  if (params.get("autostart") === "1" && userId) {
+    start();
+  }
+}, [userId]);
+  
+  useEffect(() => {
     endRef.current?.scrollIntoView({
       behavior: "smooth",
     });
