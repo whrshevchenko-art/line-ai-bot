@@ -708,6 +708,8 @@ function selectEmployee(selected) {
   }
 
   loadStats(selected.id);
+
+  window.location.href = "/sales-quest/start";
 }
 
 function logout() {
